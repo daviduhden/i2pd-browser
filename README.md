@@ -23,4 +23,4 @@ from i2pd webconsole page `http://127.0.0.1:7070/?page=commands`
 
 Disclaimer
 -----
-To use this browser you need to have previously [installed](https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux) and [started/enabled] I2Pd on your Linux system.
+To use this browser you need to have previously [installed](https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux) I2Pd on your Linux system.
