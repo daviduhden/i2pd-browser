@@ -8,7 +8,6 @@ What works now
 * Auto detecting architecture
 * Pre-configuring Firefox to use with I2Pd
 * Auto downloading NoScript extension
-* Checking if I2Pd is installed and running
 
 How to use it
 -----
