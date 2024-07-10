@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# See LICENSE file at the top of project tree for copyright and license details.
+# See the LICENSE file at the top of the project tree for copyright and license details.
 
 # Check if I2Pd is installed and running on different systems
 if command -v dpkg > /dev/null; then
