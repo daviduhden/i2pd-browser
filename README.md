@@ -1,6 +1,6 @@
 I2Pd Browser
 =====
-This is a script-based builder of the I2Pd Browser for Linux
+This is a script-based builder of the I2Pd Browser for Linux-based systems.
 
 What works now
 -----
