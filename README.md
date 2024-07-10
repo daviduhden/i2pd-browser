@@ -14,7 +14,7 @@ What works now
 How to use it
 -----
 1. Build the pre-configured Firefox using the `./build` shell script from the `build` directory
-2. Run I2Pd by executing the `./i2pd` shell script from `i2pd` folder
+2. Run I2Pd by executing the `./i2pd` shell script from `i2pd` directory
 3. Run Firefox by executing the `./start-i2pd-browser.desktop` desktop entry
 
 Additional info
