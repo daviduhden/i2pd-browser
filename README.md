@@ -2,6 +2,8 @@ I2Pd Browser
 =====
 This is a script-based builder of the I2Pd Browser for Linux-based systems.
 
+The I2Pd browser is a pre-configured version of Firefox ESR for its use on the I2P network, it is the fastest and easiest way to start surfing the web on the Invisible Internet.
+
 What works now
 -----
 * Auto detecting system language
@@ -11,7 +13,7 @@ What works now
 
 How to use it
 -----
-1. Build pre-configured Firefox using script `./build` from `build` folder
+1. Build the pre-configured Firefox using the `./build` script from the `build` folder
 2. Run I2Pd by executing `./i2pd` from `i2pd` folder
 3. Run Firefox by executing `./start-i2pd-browser.desktop`
 
