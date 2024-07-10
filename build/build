@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# See LICENSE file at the top of project tree for copyright and license details.
+# See the LICENSE file at the top of the project tree for copyright and license details.
 
 dir=${0%/*}
 if [ "$dir" = "$0" ]; then
