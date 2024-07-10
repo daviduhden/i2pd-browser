@@ -1,8 +1,6 @@
 #!/bin/sh
 
-# Copyright (c) 2013-2019, The PurpleI2P Project
-# This file is part of Purple I2P project and licensed under the BSD-3-Clause
-# See full license text in LICENSE file at top of project tree
+# See LICENSE file for copyright and license details.
 
 # Check if I2Pd is installed and running on different systems
 if command -v dpkg > /dev/null; then
