@@ -5,9 +5,9 @@ This is a script-based builder of the I2Pd Browser for Linux-based systems.
 What works now
 -----
 * Auto detecting system language
-* Auto detecting architecture
+* Auto detecting system architecture
 * Pre-configuring Firefox to use with I2Pd
-* Auto downloading NoScript extension
+* Auto downloading the NoScript extension
 
 How to use it
 -----
