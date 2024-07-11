@@ -74,7 +74,8 @@
 			"network.IDN_show_punycode": false,
 			"network.dns.disableIPv6": true,
 			"places.history.enabled": false,
-			"privacy.file_unique_origin": true
+			"privacy.file_unique_origin": true,
+			"privacy.clearOnShutdown.cookies": true
 		},
 		"PromptForDownloadLocation": true,
 		"Proxy": {
