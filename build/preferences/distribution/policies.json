@@ -74,15 +74,7 @@
 			"network.IDN_show_punycode": false,
 			"network.dns.disableIPv6": true,
 			"places.history.enabled": false,
-			"privacy.file_unique_origin": true,
-			"privacy.clearOnShutdown.cookies": true,
-			"privacy.clearOnShutdown.offlineApps": true,
-			"privacy.clearOnShutdown.siteSettings": true,
-			"privacy.trackingprotection.enabled": true,
-			"privacy.trackingprotection.pbmode.enabled": true,
-			"privacy.trackingprotection.socialtracking.enabled": true,
-			"network.cookie.cookieBehavior.pbmode": 1,
-			"privacy.trackingprotection.content.enabled": true
+			"privacy.file_unique_origin": true
 		},
 		"PromptForDownloadLocation": true,
 		"Proxy": {
