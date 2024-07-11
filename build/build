@@ -29,7 +29,7 @@ if [ -z $curlfind ]; then
 	exit 1
 fi
 
-echo "This script is preparing Firefox ESR $version for use with I2Pd"
+echo "This script is preparing Firefox ESR version $version for its use with I2Pd"
 
 # Define the filename and filepath for the Firefox package
 file="firefox-$version.tar.bz2"
