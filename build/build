@@ -30,14 +30,14 @@ if ! command -v curl >/dev/null 2>&1; then
 	exit 1
 fi
 
-echo "This script is preparing Firefox ESR version $version for its use with I2Pd"
+echo "This script is preparing Firefox version $version for its use with I2Pd"
 
 # Define the filename and filepath for the Firefox package
 file="firefox-$version.tar.bz2"
 filepath="linux-$arch/$language/$file"
 
 # Download Firefox
-echo "Downloading Firefox ESR version $version..."
+echo "Downloading Firefox version $version..."
 curl -L -f -# -O "$ftpmirror/$filepath"
 if [ $? -ne 0 ]; then
 	echo "[Error] Can't download file. Check your internet connectivity."
