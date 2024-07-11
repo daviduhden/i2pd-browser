@@ -9,12 +9,12 @@ The I2Pd browser is a pre-configured version of Firefox ESR for use on the I2P n
 ## Features
 
 - **Auto-detecting system architecture**: The script automatically detects the system architecture to configure Firefox accordingly.
-- **Pre-configuring Firefox**: Firefox ESR is pre-configured for use with I2Pd, including necessary settings adjustments.
+- **Pre-configuring Firefox**: Firefox is pre-configured for use with I2Pd, including necessary settings adjustments.
 - **Automatic downloads**:
   - **NoScript extension**: The script downloads and installs the NoScript extension for added security.
   - **Language packs**: Language packs for Firefox are automatically downloaded based on the system language.
 - **Checksum verification**: Ensures the integrity of the downloaded Firefox package.
-- **Environment preservation**: The desktop entry script preserves arguments and environment for the `start-i2pd-browser` script.
+- **Environment preservation**: Maintains the environment variables and arguments when executing the `start-i2pd-browser` script, ensuring consistent configuration and behavior.
 - **Self-modifying .desktop file**:
   - Supports relocation of the .desktop file.
   - Can register and unregister itself as a desktop application for the current user.
@@ -71,6 +71,6 @@ cd ../
 
 ## Additional information
 
-- `./i2pd` from the `i2pd` folder starts a screen session with I2Pd in it.
-- To stop the I2Pd router, you can use the commands `Start graceful shutdown` or `Force shutdown` from the I2Pd web console page: `http://127.0.0.1:7070/?page=commands`.
+- The `i2pd` shell script from the `i2pd` directory starts a `screen` session with I2Pd in it.
+- To stop the I2Pd router, you can execute the commands `Start graceful shutdown` or `Force shutdown` from the I2Pd web console page: `http://127.0.0.1:7070/?page=commands`.
 
