@@ -81,7 +81,9 @@
 			"privacy.clearOnShutdown.siteSettings": true,
 			"privacy.trackingprotection.enabled": true,
 			"privacy.trackingprotection.pbmode.enabled": true,
-			"privacy.trackingprotection.socialtracking.enabled": true
+			"privacy.trackingprotection.socialtracking.enabled": true,
+			"network.cookie.cookieBehavior.pbmode": 1,
+			"privacy.trackingprotection.content.enabled": true
 		},
 		"PromptForDownloadLocation": true,
 		"Proxy": {
