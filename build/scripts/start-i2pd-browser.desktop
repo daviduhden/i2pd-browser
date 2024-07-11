@@ -1,4 +1,4 @@
-#!/usr/bin/env ./browser/execdesktop
+#!./browser/execdesktop
 
 # See the LICENSE file at the top of the project tree for copyright and license
 # details.
@@ -30,7 +30,7 @@ Type=Application
 Name=I2Pd Browser Setup
 GenericName=I2Pd Browser
 Comment=I2Pd Browser for surfing I2P sites
-Categories=Network                                                                                                                                                                      ;WebBrowser;Security;
+Categories=Network;WebBrowser;Security;
 Exec=sh -c '"$(dirname "$*")"/browser/start-i2pd-browser --detach || ([ ! -x "$(dirname "$*")"/browser/start-i2pd-browser ] && "$(dirname "$*")"/start-i2pd-browser --detach)' dummy %k
 X-I2PdBrowser-ExecShell=./browser/start-i2pd-browser --detach
 Icon=web-browser
