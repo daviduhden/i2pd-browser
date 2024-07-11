@@ -2,12 +2,14 @@
 
 # See the LICENSE file at the top of the project tree for copyright and license details.
 
+# This script automates the process of preparing Firefox ESR for its use with I2Pd.
+# It downloads the specified version of Firefox, verifies its integrity,extracts it, 
+# removes unnecessary files, updates configuration settings, downloads language packs 
+# and extensions, and finally copies necessary scripts and configurations for the I2Pd Browser.
+
 # Set the directory to the script's location
-dir=${0%/*}
-if [ "$dir" = "$0" ]; then
-	dir="."
-fi
-cd $dir
+dir=$(dirname "$0")
+cd "$dir" || exit 1
 
 # Detect the system architecture
 arch=$(uname -m)
@@ -23,8 +25,7 @@ if [ "$arch" = "amd64" ]; then
 fi
 
 # Check if 'curl' is installed
-curlfind=$(which curl)
-if [ -z $curlfind ]; then
+if ! command -v curl >/dev/null 2>&1; then
 	echo "'cURL' does not seem to be installed. The script needs it!"
 	exit 1
 fi
@@ -37,24 +38,24 @@ filepath="linux-$arch/$language/$file"
 
 # Download Firefox
 echo "Downloading Firefox ESR version $version..."
-curl -L -f -# -O $ftpmirror/$filepath
+curl -L -f -# -O "$ftpmirror/$filepath"
 if [ $? -ne 0 ]; then
 	echo "[Error] Can't download file. Check your internet connectivity."
 	exit 1
 fi
 
 # Verify the downloaded file exists
-if [ ! -f $file ]; then
+if [ ! -f "$file" ]; then
 	echo "[Error] Can't find downloaded file. Does it really exist?"
 	exit 1
 fi
 
 # Download and check the checksum file
 echo "Downloading checksum file and checking SHA512 checksum"
-curl -L -f -# -O $ftpmirror/SHA512SUMS
+curl -L -f -# -O "$ftpmirror/SHA512SUMS"
 recv_sum=$(grep "$filepath" SHA512SUMS | cut -c-128)
-file_sum=$(sha512sum $file | cut -c-128)
-if [ $recv_sum != $file_sum ]; then
+file_sum=$(sha512sum "$file" | cut -c-128)
+if [ "$recv_sum" != "$file_sum" ]; then
 	echo "[Error] File checksum failed!"
 	exit 1
 else
@@ -67,24 +68,24 @@ echo "Extracting the archive, please wait..."
 if [ -d "../browser" ]; then
 	rm -r ../browser
 fi
-tar xfj $file
-rm $file
+tar xfj "$file"
+rm "$file"
 mv firefox ../browser
 mkdir ../browser/data
 
 # Remove unnecessary files
 echo "Removing unnecessary files..."
-rm ../browser/crashreporter*
-rm ../browser/minidump-analyzer
-rm ../browser/pingsender
-rm ../browser/precomplete
-rm ../browser/removed-files
-rm ../browser/update*
-rm ../browser/Throbber-small.gif
-rm ../browser/browser/crashreporter-override.ini
-rm ../browser/browser/features/formautofill@mozilla.org.xpi
-rm ../browser/browser/features/screenshots@mozilla.org.xpi
-rm -r ../browser/icons
+rm -f ../browser/crashreporter*
+rm -f ../browser/minidump-analyzer
+rm -f ../browser/pingsender
+rm -f ../browser/precomplete
+rm -f ../browser/removed-files
+rm -f ../browser/update*
+rm -f ../browser/Throbber-small.gif
+rm -f ../browser/browser/crashreporter-override.ini
+rm -f ../browser/browser/features/formautofill@mozilla.org.xpi
+rm -f ../browser/browser/features/screenshots@mozilla.org.xpi
+rm -rf ../browser/icons
 
 # Update configuration files
 echo "Updating configuration files..."
@@ -93,7 +94,7 @@ sed -i 's/ServerURL=.*/ServerURL=-/' ../browser/application.ini
 
 # Download language packs
 echo "Downloading the language packs..."
-mkdir ../browser/browser/extensions
+mkdir -p ../browser/browser/extensions
 curl -L -f -# -o ../browser/browser/extensions/langpack-en-US@firefox.mozilla.org.xpi https://addons.mozilla.org/firefox/downloads/file/4144407/english_us_language_pack-115.0.20230726.201356.xpi
 curl -L -f -# -o ../browser/browser/extensions/en-US@dictionaries.addons.mozilla.org.xpi https://addons.mozilla.org/firefox/downloads/file/4175230/us_english_dictionary-115.0.xpi
 
