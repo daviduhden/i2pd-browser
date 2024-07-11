@@ -1,8 +1,8 @@
 #!/usr/bin/env ./browser/execdesktop
-#
+
 # See the LICENSE file at the top of the project tree for copyright and license
 # details.
-#
+
 # This file is a self-modifying .desktop file that can be run from the shell.
 # It preserves arguments and environment for the start-i2pd-browser script.
 #

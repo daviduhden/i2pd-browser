@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# See the LICENSE file at the top of the project tree for copyright and license details.
+
 I2PDB_START_PROG="$(grep '^X-I2PdBrowser-ExecShell' $1 | tail -1 | sed 's/^X-I2PdBrowser-ExecShell=//' | sed 's/%.//')"
 
 shift
