@@ -75,7 +75,6 @@
 			"network.dns.disableIPv6": true,
 			"places.history.enabled": false,
 			"privacy.file_unique_origin": true,
-			"privacy.file_unique_origin": true,
 			"privacy.clearOnShutdown.cookies": true,
 			"privacy.clearOnShutdown.offlineApps": true,
 			"privacy.clearOnShutdown.siteSettings": true,
