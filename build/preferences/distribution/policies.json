@@ -82,7 +82,8 @@
 			"privacy.trackingprotection.pbmode.enabled": true,
 			"privacy.trackingprotection.socialtracking.enabled": true,
 			"network.cookie.cookieBehavior.pbmode": 1,
-			"privacy.trackingprotection.content.enabled": true
+			"privacy.trackingprotection.content.enabled": true,
+			"browser.privatebrowsing.autostart": true
 		},
 		"PromptForDownloadLocation": true,
 		"Proxy": {
