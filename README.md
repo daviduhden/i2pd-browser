@@ -73,4 +73,5 @@ cd ../
 
 - The `i2pd` shell script from the `i2pd` directory starts a `screen` session with I2Pd in it.
 - To stop the I2Pd router, you can execute the commands `Start graceful shutdown` or `Force shutdown` from the I2Pd web console page: `http://127.0.0.1:7070/?page=commands`.
+- The pre-compiled i2pd binaries available for Unix-like operating systems such as Linux and *BSD do not have built-in support for UPnP by default, which makes it very inconvenient for client use. If you want UPnP to work you need to compile I2Pd yourself. For more information refer to the [official documentation](https://i2pd.readthedocs.io/en/latest/devs/building/unix/).
 
