@@ -2,52 +2,66 @@
 
 # See the LICENSE file at the top of the project tree for copyright and license details.
 
-# Check if I2Pd is installed and running on different systems
-if command -v dpkg > /dev/null; then
-	if dpkg -l | grep -q i2pd; then
-		check_i2pd_running
+# Function to check if I2Pd is running
+check_i2pd_running() {
+	# Use pgrep to check if i2pd is running
+	if pgrep -x "i2pd" > /dev/null; then
+		echo "I2Pd is installed and running."
 	else
-		echo "I2Pd is not installed. Please install I2Pd to proceed using the browser."
-		echo "https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux"
+		echo "I2Pd is installed but not running. Please start I2Pd to proceed."
 	fi
-elif command -v pacman > /dev/null; then
-	if pacman -Qs i2pd > /dev/null; then
-		check_i2pd_running
-	else
-		echo "I2Pd is not installed. Please install I2Pd to proceed using the browser."
-		echo "https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux"
+}
+
+# Define possible locations where i2pd binary might be found
+possible_locations="
+/usr/sbin/i2pd
+/usr/local/sbin/i2pd
+/usr/bin/i2pd
+/usr/local/bin/i2pd
+/sbin/i2pd
+/bin/i2pd
+"
+
+# Initialize a flag to indicate if i2pd was found
+i2pd_found=false
+
+# Iterate over each possible location to check if i2pd binary exists and is executable
+for location in $possible_locations; do
+	if [ -x "$location" ]; then
+		# If executable binary is found, set the path and update the flag
+		i2pd_path="$location"
+		i2pd_found=true
+		break
 	fi
-elif command -v emerge > /dev/null; then
-	if emerge --search i2pd | grep -q "Latest version available"; then
-		check_i2pd_running
-	else
-		echo "I2Pd is not installed. Please install I2Pd to proceed using the browser."
-		echo "https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux"
-	fi
-elif command -v xbps-query > /dev/null; then
-	if xbps-query -Rs i2pd > /dev/null; then
-		check_i2pd_running
-	else
-		echo "I2Pd is not installed. Please install I2Pd to proceed using the browser."
-		echo "https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux"
-	fi
+done
+
+# Check if i2pd was found in the possible locations
+if [ "$i2pd_found" = true ]; then
+	# If found, check if it is running
+	check_i2pd_running
 else
-	echo "Unsupported package manager. Please ensure I2Pd is installed and running."
+	# If not found, print an error message and exit
+	echo "I2Pd is not installed or not found in standard locations. Please install I2Pd to proceed using the browser."
 	echo "https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux"
 	exit 1
 fi
 
+# Get the system architecture
 arch=$(uname -m)
 
+# Check if 'screen' is installed
 screenfind=$(which screen)
-if [ -z $screenfind ]; then
-	echo "Can't find 'screen' installed. This script needs it!";
-	exit 1;
+if [ -z "$screenfind" ]; then
+	echo "Can't find 'screen' installed. This script needs it!"
+	exit 1
 fi
 
-if [ $arch = "x86_64" ]; then
-	screen -Adm -S i2pd /usr/sbin/i2pd --datadir=.
+# Check the system architecture and start i2pd in a screen session
+if [ "$arch" = "x86_64" ]; then
+	# Start i2pd using screen in detached mode with the found path
+	screen -Adm -S i2pd "$i2pd_path" --datadir=.
 else
+	# If the architecture is not supported, print an error message and exit
 	echo "Your system architecture is not supported."
 	exit 1
 fi
