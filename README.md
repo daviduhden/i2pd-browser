@@ -11,14 +11,14 @@ The I2Pd browser is a pre-configured version of Firefox ESR for use on the I2P n
 - **Auto-detecting system architecture**: The script automatically detects the system architecture to configure Firefox accordingly.
 - **Pre-configuring Firefox**: Firefox is pre-configured for use with I2Pd, including necessary settings adjustments.
 - **Automatic downloads**:
-  - **NoScript extension**: The script downloads and installs the NoScript extension for added security.
-  - **Language packs**: Language packs for Firefox are automatically downloaded.
+	- **NoScript extension**: The script downloads and installs the NoScript extension for added security.
+	- **Language packs**: Language packs for Firefox are automatically downloaded.
 - **Checksum verification**: Ensures the integrity of the downloaded Firefox package.
 - **Environment preservation**: Maintains the environment variables and arguments when executing the `start-i2pd-browser` script, ensuring consistent configuration and behavior.
 - **Self-modifying .desktop file**:
-  - Supports relocation of the .desktop file.
-  - Can register and unregister itself as a desktop application for the current user.
-  - Supports being used as a portable app.
+	- Supports relocation of the .desktop file.
+	- Can register and unregister itself as a desktop application for the current user.
+	- Supports being used as a portable app.
 
 ## Dependencies
 
@@ -32,42 +32,42 @@ Ensure you have the following dependencies installed on your Linux system before
 ## How to Use It
 
 1. Install the dependencies if they are not already installed.
-    
+		
 3. Clone the `i2pd-browser` repository:
 
-  ```sh
-  git clone https://github.com/daviduhden/i2pd-browser/
-  ```
-  ```sh
-  cd i2pd-browser
-  ```
+	```sh
+	git clone https://github.com/daviduhden/i2pd-browser/
+	```
+	```sh
+	cd i2pd-browser
+	```
 
 4. Build the pre-configured Firefox using the `build` shell script from the `build` directory:
 
-  ```sh
-  cd build
-  ```
-  ```sh
-  ./build
-  ```
+	```sh
+	cd build
+	```
+	```sh
+	./build
+	```
 
 5. Run I2Pd by executing the `i2pd` shell script from `i2pd` directory:
 
-  ```sh
-  cd ../i2pd
-  ```
-  ```sh
-  ./i2pd
-  ```
+	```sh
+	cd ../i2pd
+	```
+	```sh
+	./i2pd
+	```
 
 6. Run Firefox by executing the `start-i2pd-browser.desktop` desktop entry:
 
-  ```sh
-  cd ../
-  ```
-  ```sh
-  ./start-i2pd-browser.desktop
-  ```
+	```sh
+	cd ../
+	```
+	```sh
+	./start-i2pd-browser.desktop
+	```
 
 ## Additional information
 
