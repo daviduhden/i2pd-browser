@@ -77,4 +77,4 @@ Ensure you have the following dependencies installed on your Linux system before
 
 ## Licensing
 
-The scripts and configuration files in this repository, as well as the [i2pd software](https://github.com/PurpleI2P/i2pd/), are licensed under the BSD 3-Clause “New” or “Revised” License. However, the Firefox ESR software is distributed under different terms and conditions. For more information, please refer to the [Mozilla Foundation's Licensing and Trademarks page](https://www.mozilla.org/en-US/foundation/licensing/).
+The files in this repository, as well as the [i2pd software](https://github.com/PurpleI2P/i2pd/), are licensed under the BSD 3-Clause “New” or “Revised” License. However, the Firefox ESR software is distributed under different terms and conditions. For more information, please refer to the [Mozilla Foundation's Licensing and Trademarks page](https://www.mozilla.org/en-US/foundation/licensing/).
