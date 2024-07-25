@@ -1,6 +1,6 @@
 # I2Pd Browser
 
-This is a script-based builder of the I2Pd Browser for Linux-based systems. Any contribution is highly appreciated.
+This is a script-based builder of the I2Pd Browser for Linux-based systems, supporting both x86_64 and i686 architectures. Any contribution is highly appreciated.
 
 > It might also work on BSD-based systems but has not yet been tested.
 
