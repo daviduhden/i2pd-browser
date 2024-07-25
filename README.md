@@ -75,3 +75,6 @@ Ensure you have the following dependencies installed on your Linux system before
 - To stop the I2Pd router, you can execute the commands `Start graceful shutdown` or `Force shutdown` from the I2Pd web console page: `http://127.0.0.1:7070/?page=commands`.
 - The pre-compiled i2pd binaries available for Unix-like operating systems such as Linux and *BSD do not have built-in support for UPnP by default, which makes it very inconvenient for client use. If you want UPnP to work you need to compile I2Pd yourself. For more information refer to the [official documentation](https://i2pd.readthedocs.io/en/latest/devs/building/unix/).
 
+## Licensing
+
+The scripts and configuration files in this repository, as well as the [i2pd software](https://github.com/PurpleI2P/i2pd/blob/openssl/LICENSE), are licensed under the BSD 3-Clause “New” or “Revised” License. However, the Firefox ESR software is distributed under different terms and conditions. For more information, please refer to the [Mozilla Foundation's Licensing and Trademarks page](https://www.mozilla.org/en-US/foundation/licensing/).
