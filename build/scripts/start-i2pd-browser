@@ -161,26 +161,24 @@ fi
 
 # Update .desktop file paths
 cp start-i2pd-browser.desktop ../
-sed -i -e "s,^Name=.*,Name=I2Pd Browser,g" ../start-i2pd-browser.desktop
-sed -i -e "s,^Icon=.*,Icon=$PWD/browser/chrome/icons/default/default128.png,g" ../start-i2pd-browser.desktop
 sed -i -e "s,^Exec=.*,Exec=sh -c '\"$PWD/start-i2pd-browser\" --detach || ([ !  -x \"$PWD/start-i2pd-browser\" ] && \"\$(dirname \"\$*\")\"/Browser/start-i2pd-browser --detach)' dummy %k,g" ../start-i2pd-browser.desktop
 
 # Register or unregister the desktop application
 if [ "$register_desktop_app" -eq 1 ]; then
-	mkdir -p "$HOME/.local/share/applications/"
-	cp ../start-i2pd-browser.desktop "$HOME/.local/share/applications/"
-	update-desktop-database "$HOME/.local/share/applications/"
-	printf "I2Pd Browser has been registered as a desktop app for this user in ~/.local/share/applications/\n"
+	mkdir -p "$HOME/.local/share/i2pd-browser/"
+	cp ../start-i2pd-browser.desktop "$HOME/.local/share/i2pd-browser/"
+	update-desktop-database "$HOME/.local/share/i2pd-browser/"
+	printf "I2Pd Browser has been registered as a desktop app for this user in ~/.local/share/i2pd-browser/\n"
 	exit 0
 fi
 
 if [ "$register_desktop_app" -eq -1 ]; then
-	if [ -e "$HOME/.local/share/applications/start-i2pd-browser.desktop" ]; then
-		rm -f "$HOME/.local/share/applications/start-i2pd-browser.desktop"
-		update-desktop-database "$HOME/.local/share/applications/"
-		printf "I2Pd Browser has been removed as a user desktop app (from ~/.local/share/applications/)\n"
+	if [ -e "$HOME/.local/share/i2pd-browser/start-i2pd-browser.desktop" ]; then
+		rm -f "$HOME/.local/share/i2pd-browser/start-i2pd-browser.desktop"
+		update-desktop-database "$HOME/.local/share/i2pd-browser/"
+		printf "I2Pd Browser has been removed as a user desktop app (from ~/.local/share/i2pd-browser/)\n"
 	else
-		printf "I2Pd Browser does not appear to be a desktop app (not present in ~/.local/share/applications/)\n"
+		printf "I2Pd Browser does not appear to be a desktop app (not present in ~/.local/share/i2pd-browser/)\n"
 	fi
 	exit 0
 fi
