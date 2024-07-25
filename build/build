@@ -19,9 +19,15 @@ language="en-US"
 version="115.13.0esr"
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
 
-# Normalize architecture name for compatibility
-if [ "$arch" = "amd64" ]; then
+# Check the system architecture
+if [ "$arch" = "amd64" ] || [ "$arch" = "x86_64" ]; then
 	arch=x86_64
+elif [ "$arch" = "i386" ] || [ "$arch" = "i686" ]; then
+	arch=i686
+else
+	# If the architecture is not supported, print an error message and exit
+	echo "Your system architecture is not supported."
+	exit 1
 fi
 
 # Check if 'curl' is installed

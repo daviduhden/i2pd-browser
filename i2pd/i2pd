@@ -61,7 +61,7 @@ if ! command -v screen >/dev/null 2>&1; then
 fi
 
 # Check the system architecture and start i2pd in a screen session
-if [ "$arch" = "x86_64" ]; then
+if [ "$arch" = "x86_64" ] || [ "$arch" = "i686" ]; then
     # Start i2pd using screen in detached mode with the found path
     screen -Adm -S i2pd "$i2pd_path" --datadir=.
 else
