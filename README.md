@@ -2,8 +2,6 @@
 
 This is a script-based builder of the I2Pd Browser for Linux-based systems, supporting both x86_64 and i686 architectures. Any contribution is highly appreciated.
 
-> It might also work on BSD-based systems but has not yet been tested.
-
 The I2Pd browser is a pre-configured version of Firefox ESR for use on the I2P network. It is the fastest and easiest way to start surfing the web on the Invisible Internet.
 
 ## Features
