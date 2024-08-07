@@ -16,7 +16,7 @@ arch=$(uname -m)
 
 # Set the variables
 language="en-US"
-version="115.13.0esr"
+version="115.14.0esr"
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
 
 # Check the system architecture
