@@ -20,9 +20,9 @@ version="115.13.0esr"
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
 
 # Check the system architecture
-if [ "$arch" = "amd64" ]; then
+if [ "$arch" = "amd64" ] || [ "$arch" = "x86_64" ]; then
 	arch=x86_64
-elif [ "$arch" = "i386" ]; then
+elif [ "$arch" = "i386" ] || [ "$arch" = "i686" ]; then
 	arch=i686
 else
 	# If the architecture is not supported, print an error message and exit
