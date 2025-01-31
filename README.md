@@ -31,7 +31,7 @@ Ensure you have the following dependencies installed on your Linux system before
 
 1. Install the dependencies if they are not already installed.
 		
-3. Clone the `i2pd-browser` repository:
+2. Clone or download this repository:
 
 	```sh
 	git clone https://github.com/daviduhden/i2pd-browser/
@@ -40,7 +40,7 @@ Ensure you have the following dependencies installed on your Linux system before
 	cd i2pd-browser
 	```
 
-4. Build the pre-configured Firefox using the `build` shell script from the `build` directory:
+3. Build the pre-configured Firefox using the `build` shell script from the `build` directory:
 
 	```sh
 	cd build
@@ -49,7 +49,7 @@ Ensure you have the following dependencies installed on your Linux system before
 	./build
 	```
 
-5. Run I2Pd by executing the `i2pd` shell script from `i2pd` directory:
+4. Run I2Pd by executing the `i2pd` shell script from `i2pd` directory:
 
 	```sh
 	cd ../i2pd
@@ -58,7 +58,7 @@ Ensure you have the following dependencies installed on your Linux system before
 	./i2pd
 	```
 
-6. Run Firefox by executing the `start-i2pd-browser.desktop` desktop entry:
+5. Run Firefox by executing the `start-i2pd-browser.desktop` desktop entry:
 
 	```sh
 	cd ../
