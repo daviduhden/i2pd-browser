@@ -27,14 +27,14 @@ Ensure you have the following dependencies installed on your Linux system before
 - **tar**: For extracting compressed files
 - **screen**: Required for managing detached sessions
 
-## How to Use It
+## Usage
 
 1. Install the dependencies if they are not already installed.
 		
 2. Clone or download this repository:
 
 	```sh
-	git clone https://github.com/daviduhden/i2pd-browser/
+	git clone https://github.com/daviduhden/i2pd-browser.git
 	```
 	```sh
 	cd i2pd-browser
