@@ -75,4 +75,4 @@ Ensure you have the following dependencies installed on your Linux system before
 
 ## Licensing
 
-The scripts and configuration files in this repository, along with the [i2pd software](https://github.com/PurpleI2P/i2pd/), are licensed under the BSD 3-Clause "New" or "Revised" License. However, the software downloaded and used by these scripts and configuration files is subject to different terms and conditions.
+The scripts and configuration files in this repository, along with the [i2pd software](https://github.com/PurpleI2P/i2pd/), are licensed under the BSD 3-Clause "New" or "Revised" License. However, the software downloaded and used by these scripts and used by these configuration files is subject to different terms and conditions.
