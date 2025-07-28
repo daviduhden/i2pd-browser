@@ -16,7 +16,7 @@ arch=$(uname -m)
 
 # Set the variables
 language="en-US"
-version="115.21.0esr"
+version="115.26.0esr"
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
 
 # Check the system architecture
@@ -106,7 +106,7 @@ curl -L -f -# -o ../browser/browser/extensions/en-US@dictionaries.addons.mozilla
 
 # Download the NoScript extension
 echo "Downloading the NoScript extension..."
-curl -L -f -# -o ../browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi https://addons.mozilla.org/firefox/downloads/file/4411102/noscript-12.1.1.xpi
+curl -L -f -# -o ../browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi https://addons.mozilla.org/firefox/downloads/file/4497468/noscript-13.0.8.xpi
 
 # Add standard configuration files
 echo "Adding standard configs..."
