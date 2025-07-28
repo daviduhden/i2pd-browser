@@ -7,18 +7,18 @@ REM See full license text in LICENSE file at top of project tree
 setlocal enableextensions
 
 set CURL=%~dp0curl.exe
-set FFversion=115.21.0esr
-set I2Pdversion=2.56.0
+set FFversion=115.26.0esr
+set I2Pdversion=2.57.0
 call :GET_ARGS %*
 call :GET_LOCALE
 call :GET_PROXY
 call :GET_ARCH
 
 if "%locale%"=="ru" (
-	echo ‘¡®àª  I2Pd Browser Portable
-	echo Ÿ§ëª ¡à ã§¥à : %locale%,  àå¨â¥ªâãà : %xOS%
+	echo ï¿½ï¿½ï¿½àª  I2Pd Browser Portable
+	echo ï¿½ï¿½ï¿½ ï¿½ï¿½ã§¥ï¿½: %locale%, ï¿½ï¿½ï¿½â¥ªï¿½ï¿½ï¿½: %xOS%
 	echo.
-	echo ‡ £àã§ª  ãáâ ­®¢é¨ª  Firefox ESR
+	echo ï¿½ï¿½ï¿½ï¿½ã§ªï¿½ ï¿½ï¿½â ­ï¿½ï¿½é¨ªï¿½ Firefox ESR
 ) else (
 	echo Building I2Pd Browser Portable
 	echo Browser locale: %locale%, architecture: %xOS%
@@ -35,7 +35,7 @@ if errorlevel 1 (
 
 echo.
 if "%locale%"=="ru" (
-	echo  á¯ ª®¢ª  ãáâ ­®¢é¨ª  ¨ ã¤ «¥­¨¥ ­¥ ­ã¦­ëå ä ©«®¢
+	echo ï¿½ï¿½á¯ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½â ­ï¿½ï¿½é¨ªï¿½ ï¿½ ã¤ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ã¦­ï¿½ï¿½ ä ©ï¿½ï¿½ï¿½
 ) else (
 	echo Unpacking the installer and deleting unnecessary files
 )
@@ -64,7 +64,7 @@ echo OK!
 
 echo.
 if "%locale%"=="ru" (
-	echo  âç¨¬ ¢­ãâà¥­­¨¥ ä ©«ë ¡à ã§¥à  ¤«ï ®âª«îç¥­¨ï ­ ¢ï§ç¨¢ëå § ¯à®á®¢
+	echo ï¿½ï¿½ï¿½ç¨¬ ï¿½ï¿½ï¿½ï¿½à¥­ï¿½ï¿½ï¿½ ä ©ï¿½ï¿½ ï¿½ï¿½ã§¥ï¿½ ï¿½ï¿½ï¿½ ï¿½âª«ï¿½ç¥­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ç¨¢ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½á®¢
 ) else (
 	echo Patching browser internal files to disable annoying external requests
 )
@@ -90,7 +90,7 @@ echo OK!
 
 echo.
 if "%locale%"=="ru" (
-	echo ‡ £àã§ª  ï§ëª®¢ëå ¯ ª¥â®¢
+	echo ï¿½ï¿½ï¿½ï¿½ã§ªï¿½ ï¿½ëª®ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½â®¢
 ) else (
 	echo Downloading language packs
 )
@@ -105,16 +105,16 @@ if errorlevel 1 ( echo ERROR:%ErrorLevel% && pause && exit ) else (echo OK!)
 
 echo.
 if "%locale%"=="ru" (
-	echo ‡ £àã§ª  ¤®¯®«­¥­¨ï NoScript
+	echo ï¿½ï¿½ï¿½ï¿½ã§ªï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ NoScript
 ) else (
 	echo Downloading NoScript extension
 )
-"%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi https://addons.mozilla.org/firefox/downloads/file/4411102/noscript-12.1.1.xpi
+"%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi https://addons.mozilla.org/firefox/downloads/file/4497468/noscript-13.0.8.xpi
 if errorlevel 1 ( echo ERROR:%ErrorLevel% && pause && exit ) else (echo OK!)
 
 echo.
 if "%locale%"=="ru" (
-	echo Š®¯¨à®¢ ­¨¥ ä ©«®¢ ­ áâà®¥ª ¢ ¯ ¯ªã Firefox
+	echo ï¿½ï¿½ï¿½ï¿½à®¢ï¿½ï¿½ï¿½ï¿½ ä ©ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½à®¥ï¿½ ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ Firefox
 ) else (
 	echo Copying Firefox launcher and settings
 )
@@ -131,7 +131,7 @@ echo OK!
 
 echo.
 if "%locale%"=="ru" (
-	echo ‡ £àã§ª  I2Pd
+	echo ï¿½ï¿½ï¿½ï¿½ã§ªï¿½ I2Pd
 ) else (
 	echo Downloading I2Pd
 )
@@ -144,7 +144,7 @@ xcopy /E /I /Y i2pd ..\i2pd > nul
 
 echo.
 if "%locale%"=="ru" (
-	echo I2Pd Browser Portable £®â®¢ ª § ¯ãáªã!
+	echo I2Pd Browser Portable ï¿½ï¿½â®¢ ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½!
 ) else (
 	echo I2Pd Browser Portable is ready to start!
 )
