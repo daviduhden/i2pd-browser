@@ -50,11 +50,11 @@ fi
 # Function to display script usage options
 browser_usage() {
 	printf "\nI2Pd Browser Script Options\n"
-	printf "  --verbose         Display Firefox output in the terminal\n"
-	printf "  --log [file]      Record Firefox output in file (default: i2pd-browser.log)\n"
-	printf "  --detach          Detach from terminal and run I2Pd Browser in the background.\n"
-	printf "  --register-app    Register I2Pd Browser as a desktop app for this user\n"
-	printf "  --unregister-app  Unregister I2Pd Browser as a desktop app for this user\n"
+	printf "	--verbose			Display Firefox output in the terminal\n"
+	printf "	--log [file]		Record Firefox output in file (default: i2pd-browser.log)\n"
+	printf "	--detach			Detach from terminal and run I2Pd Browser in the background.\n"
+	printf "	--register-app		Register I2Pd Browser as a desktop app for this user\n"
+	printf "	--unregister-app	Unregister I2Pd Browser as a desktop app for this user\n"
 }
 
 log_output=0
@@ -68,48 +68,48 @@ logfile=/dev/null
 while :
 do
 	case "$1" in
-	  --detach)
-		  detach=1
-		  shift
-		  ;;
-	  -v | --verbose | -d | --debug)
-		  show_output=1
-		  shift
-		  ;;
-	  -h | "-?" | --help | -help)
-		  show_usage=1
-		  show_output=1
-		  shift
-		  ;;
-	  -l | --log)
-		  if [ -z "$2" ] || [ "${2#-}" != "$2" ]; then
+		--detach)
+			detach=1
+			shift
+			;;
+		-v | --verbose | -d | --debug)
+			show_output=1
+			shift
+			;;
+		-h | "-?" | --help | -help)
+			show_usage=1
+			show_output=1
+			shift
+			;;
+		-l | --log)
+			if [ -z "$2" ] || [ "${2#-}" != "$2" ]; then
 			 printf "Logging I2Pd Browser debug information to i2pd-browser.log\n"
 			 logfile="../i2pd-browser.log"
-		  elif [ "${2#/}" = "$2" ] && [ "${2#~}" = "$2" ]; then
+			elif [ "${2#/}" = "$2" ] && [ "${2#~}" = "$2" ]; then
 			 printf "Logging I2Pd Browser debug information to %s\n" "$2"
 			 logfile="../$2"
 			 shift
-		  else
+			else
 			 printf "Logging I2Pd Browser debug information to %s\n" "$2"
 			 logfile="$2"
 			 shift
-		  fi
-		  log_output=1
-		  shift
-		  ;;
-	  --register-app)
-		  register_desktop_app=1
-		  show_output=1
-		  shift
-		  ;;
-	  --unregister-app)
-		  register_desktop_app=-1
-		  show_output=1
-		  shift
-		  ;;
-	  *) # No more options
-		  break
-		  ;;
+			fi
+			log_output=1
+			shift
+			;;
+		--register-app)
+			register_desktop_app=1
+			show_output=1
+			shift
+			;;
+		--unregister-app)
+			register_desktop_app=-1
+			show_output=1
+			shift
+			;;
+		*) # No more options
+			break
+			;;
 	esac
 done
 
@@ -155,13 +155,13 @@ fi
 
 # Fix for ibus issue on some Linux systems
 if [ ! -d ".config/ibus" ]; then
-  mkdir -p .config/ibus
-  ln -nsf ~/.config/ibus/bus .config/ibus
+	mkdir -p .config/ibus
+	ln -nsf ~/.config/ibus/bus .config/ibus
 fi
 
 # Update .desktop file paths
 cp start-i2pd-browser.desktop ../
-sed -i -e "s,^Exec=.*,Exec=sh -c '\"$PWD/start-i2pd-browser\" --detach || ([ !  -x \"$PWD/start-i2pd-browser\" ] && \"\$(dirname \"\$*\")\"/Browser/start-i2pd-browser --detach)' dummy %k,g" ../start-i2pd-browser.desktop
+sed -i -e "s,^Exec=.*,Exec=sh -c '\"$PWD/start-i2pd-browser\" --detach || ([ !	-x \"$PWD/start-i2pd-browser\" ] && \"\$(dirname \"\$*\")\"/Browser/start-i2pd-browser --detach)' dummy %k,g" ../start-i2pd-browser.desktop
 
 # Register or unregister the desktop application
 if [ "$register_desktop_app" -eq 1 ]; then

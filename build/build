@@ -4,8 +4,8 @@
 
 # This script automates the process of preparing Firefox ESR for its use with I2Pd.
 # It downloads the specified version of Firefox, verifies its integrity,extracts it, 
-# removes unnecessary files, updates configuration settings, downloads language packs 
-# and extensions, and finally copies necessary scripts and configurations for the I2Pd Browser.
+# removes unnecessary files, updates configuration settings and extensions, and 
+# finally copies necessary scripts and configurations for the I2Pd Browser.
 
 # Set the directory to the script's location
 dir=$(dirname "$0")
@@ -14,9 +14,9 @@ cd "$dir" || exit 1
 # Detect the system architecture
 arch=$(uname -m)
 
-# Set the variables
+# Set variables
 language="en-US"
-version="115.26.0esr"
+version="140.3.1esr"
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
 
 # Check the system architecture
@@ -25,7 +25,6 @@ if [ "$arch" = "amd64" ] || [ "$arch" = "x86_64" ]; then
 elif [ "$arch" = "i386" ] || [ "$arch" = "i686" ]; then
 	arch=i686
 else
-	# If the architecture is not supported, print an error message and exit
 	echo "Your system architecture is not supported."
 	exit 1
 fi
@@ -38,17 +37,16 @@ fi
 
 echo "This script is preparing Firefox version $version for its use with I2Pd"
 
-# Define the filename and filepath for the Firefox package
-file="firefox-$version.tar.bz2"
+# Firefox package info
+file="firefox-$version.tar.xz"
 filepath="linux-$arch/$language/$file"
 
 # Download Firefox
 echo "Downloading Firefox version $version..."
-curl -L -f -# -O "$ftpmirror/$filepath"
-if [ $? -ne 0 ]; then
+curl -L -f -# -O "$ftpmirror/$filepath" || {
 	echo "[Error] Can't download file. Check your internet connectivity."
 	exit 1
-fi
+}
 
 # Verify the downloaded file exists
 if [ ! -f "$file" ]; then
@@ -58,7 +56,10 @@ fi
 
 # Download and check the checksum file
 echo "Downloading checksum file and checking SHA512 checksum"
-curl -L -f -# -O "$ftpmirror/SHA512SUMS"
+curl -L -f -# -O "$ftpmirror/SHA512SUMS" || {
+	echo "[Error] Can't download SHA512SUMS."
+	exit 1
+}
 recv_sum=$(grep "$filepath" SHA512SUMS | cut -c-128)
 file_sum=$(sha512sum "$file" | cut -c-128)
 if [ "$recv_sum" != "$file_sum" ]; then
@@ -66,18 +67,16 @@ if [ "$recv_sum" != "$file_sum" ]; then
 	exit 1
 else
 	echo "Checksum correct."
-	rm SHA512SUMS
+	rm -f SHA512SUMS
 fi
 
-# Extract the downloaded archive
+# Extract the downloaded archive (.xz)
 echo "Extracting the archive, please wait..."
-if [ -d "../browser" ]; then
-	rm -r ../browser
-fi
-tar xfj "$file"
+[ -d "../browser" ] && rm -r ../browser
+tar xfJ "$file"
 rm "$file"
 mv firefox ../browser
-mkdir ../browser/data
+mkdir -p ../browser/data
 
 # Remove unnecessary files
 echo "Removing unnecessary files..."
@@ -95,18 +94,13 @@ rm -rf ../browser/icons
 
 # Update configuration files
 echo "Updating configuration files..."
-sed -i 's/Enabled=1/Enabled=0/g' ../browser/application.ini
-sed -i 's/ServerURL=.*/ServerURL=-/' ../browser/application.ini
-
-# Download language packs
-echo "Downloading the language packs..."
-mkdir -p ../browser/browser/extensions
-curl -L -f -# -o ../browser/browser/extensions/langpack-en-US@firefox.mozilla.org.xpi https://addons.mozilla.org/firefox/downloads/file/4144407/english_us_language_pack-115.0.20230726.201356.xpi
-curl -L -f -# -o ../browser/browser/extensions/en-US@dictionaries.addons.mozilla.org.xpi https://addons.mozilla.org/firefox/downloads/file/4175230/us_english_dictionary-115.0.xpi
+sed -i 's/Enabled=1/Enabled=0/g' ../browser/application.ini || true
+sed -i 's/ServerURL=.*/ServerURL=-/' ../browser/application.ini || true
 
 # Download the NoScript extension
 echo "Downloading the NoScript extension..."
-curl -L -f -# -o ../browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi https://addons.mozilla.org/firefox/downloads/file/4497468/noscript-13.0.8.xpi
+curl -L -f -# -o ../browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi \
+	"https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
 
 # Add standard configuration files
 echo "Adding standard configs..."
