@@ -70,7 +70,7 @@ else
 	rm -f SHA512SUMS
 fi
 
-# Extract the downloaded archive (.xz)
+# Extract the downloaded archive
 echo "Extracting the archive, please wait..."
 [ -d "../browser" ] && rm -r ../browser
 tar xfJ "$file"
