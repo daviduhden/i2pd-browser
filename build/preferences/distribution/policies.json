@@ -36,7 +36,7 @@
 		"Pocket": false,
 		"Search": true,
 		"Snippets": false,
-		"TopSites": true
+		"TopSites": false
 	},
 
 	"NoDefaultBookmarks": true,
