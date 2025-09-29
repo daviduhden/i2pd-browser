@@ -1,11 +1,13 @@
 #!/bin/sh
 
 # See the LICENSE file at the top of the project tree for copyright and license details.
-
+#
 # This script automates the process of preparing Firefox ESR for its use with I2Pd.
-# It downloads the specified version of Firefox, verifies its integrity,extracts it, 
-# removes unnecessary files, updates configuration settings and extensions, and 
-# finally copies necessary scripts and configurations for the I2Pd Browser.
+# It discovers the latest Firefox ESR, downloads it, verifies its integrity,
+# extracts it, removes unnecessary files, updates configuration settings and extensions,
+# and finally copies necessary scripts and configurations for the I2Pd Browser.
+
+set -e
 
 # Set the directory to the script's location
 dir=$(dirname "$0")
@@ -14,36 +16,59 @@ cd "$dir" || exit 1
 # Detect the system architecture
 arch=$(uname -m)
 
-# Set variables
-language="en-US"
-version="140.3.1esr"
+# ---- Config ----
+language="${language:-en-US}"
+ESR_PRODUCT="${ESR_PRODUCT:-firefox-esr-latest}"
+
+# Check if required tools exist
+command -v curl >/dev/null 2>&1 || { echo "'cURL' does not seem to be installed. The script needs it!"; exit 1; }
+command -v sha512sum >/dev/null 2>&1 || { echo "'sha512sum' is required for integrity verification."; exit 1; }
+command -v grep >/dev/null 2>&1 || { echo "'grep' is required."; exit 1; }
+
+# Map arch for redirector (os=) and for the checksums path (linux-*)
+case "$arch" in
+	amd64|x86_64)
+		arch=x86_64
+		fx_os="linux64"
+		fx_dir="linux-x86_64"
+		;;
+	i386|i686)
+		arch=i686
+		fx_os="linux"
+		fx_dir="linux-i686"
+		;;
+	*)
+		echo "Your system architecture is not supported."
+		exit 1
+		;;
+esac
+
+echo "Discovering latest Firefox ESR for $fx_os ($arch), lang: $language ..."
+final_url=$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
+	"https://download.mozilla.org/?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")
+
+if [ -z "$final_url" ]; then
+	echo "[Error] Couldn't resolve Firefox download URL via redirector."
+	exit 1
+fi
+
+file=$(basename "$final_url")
+# Try to extract version from filename
+version=$(printf "%s" "$file" | sed -E 's/^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$/\1/')
+
+if [ -z "$version" ]; then
+	echo "[Error] Couldn't parse version from filename: $file"
+	exit 1
+fi
+
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
-
-# Check the system architecture
-if [ "$arch" = "amd64" ] || [ "$arch" = "x86_64" ]; then
-	arch=x86_64
-elif [ "$arch" = "i386" ] || [ "$arch" = "i686" ]; then
-	arch=i686
-else
-	echo "Your system architecture is not supported."
-	exit 1
-fi
-
-# Check if 'curl' is installed
-if ! command -v curl >/dev/null 2>&1; then
-	echo "'cURL' does not seem to be installed. The script needs it!"
-	exit 1
-fi
+filepath="$fx_dir/$language/$file"
 
 echo "This script is preparing Firefox version $version for its use with I2Pd"
 
-# Firefox package info
-file="firefox-$version.tar.xz"
-filepath="linux-$arch/$language/$file"
-
-# Download Firefox
-echo "Downloading Firefox version $version..."
-curl -L -f -# -O "$ftpmirror/$filepath" || {
+# Download Firefox (from the resolved final URL)
+echo "Downloading Firefox $version..."
+curl -L -f -# -O "$final_url" || {
 	echo "[Error] Can't download file. Check your internet connectivity."
 	exit 1
 }
@@ -60,9 +85,10 @@ curl -L -f -# -O "$ftpmirror/SHA512SUMS" || {
 	echo "[Error] Can't download SHA512SUMS."
 	exit 1
 }
-recv_sum=$(grep "$filepath" SHA512SUMS | cut -c-128)
+# Use an anchored grep to reduce ambiguity
+recv_sum=$(grep " $filepath\$" SHA512SUMS | cut -c-128)
 file_sum=$(sha512sum "$file" | cut -c-128)
-if [ "$recv_sum" != "$file_sum" ]; then
+if [ "$recv_sum" != "$file_sum" ] || [ -z "$recv_sum" ]; then
 	echo "[Error] File checksum failed!"
 	exit 1
 else
@@ -73,7 +99,11 @@ fi
 # Extract the downloaded archive
 echo "Extracting the archive, please wait..."
 [ -d "../browser" ] && rm -r ../browser
-tar xfJ "$file"
+case "$file" in
+	*.tar.xz)  tar xJf "$file" ;;
+	*.tar.bz2) tar xjf "$file" ;;
+	*)         tar xf "$file"  ;;
+esac
 rm "$file"
 mv firefox ../browser
 mkdir -p ../browser/data
