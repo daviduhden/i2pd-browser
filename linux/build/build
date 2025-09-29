@@ -40,7 +40,7 @@ file=$(basename "$final_url")
 echo "Downloading Firefox: $file"
 curl -L -f -# -O "$final_url"
 
-# Extract version from filename (e.g., 140.3.1esr)
+# Extract version from filename
 version=$(printf "%s" "$file" | sed -E 's/^firefox-([^.]*(\.[^.]*)*)\.(tar\.(bz2|xz))$/\1/')
 [ -n "$version" ] || { echo "[Error] Couldn't parse Firefox version."; exit 1; }
 
@@ -82,7 +82,7 @@ echo "Downloading language packs & dictionaries..."
 mkdir -p ../browser/browser/extensions
 
 # Version-pinned language packs (match the exact Firefox you downloaded)
-xpi_base="https://releases.mozilla.org/pub/firefox/releases/${version}/xpi"
+xpi_base="https://releases.mozilla.org/pub/firefox/releases/${version}/${fx_os}/xpi"
 
 # Always add RU so users can switch from EN
 curl -L -f -# -o ../browser/browser/extensions/langpack-ru@firefox.mozilla.org.xpi \
@@ -94,7 +94,7 @@ if [ "$fx_lang" = "ru" ]; then
     "${xpi_base}/en-US.xpi"
 fi
 
-# Dictionaries (not version-locked)
+# Dictionaries
 curl -L -f -# -o ../browser/browser/extensions/ru@dictionaries.addons.mozilla.org.xpi \
   "https://addons.mozilla.org/firefox/downloads/latest/russian-spellchecking-dic-3703/latest.xpi"
 curl -L -f -# -o ../browser/browser/extensions/en-US@dictionaries.addons.mozilla.org.xpi \

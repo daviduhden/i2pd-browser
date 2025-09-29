@@ -24,7 +24,17 @@ echo.
 echo Downloading Firefox ESR installer
 echo Загрузка установщика Firefox ESR
 
-if /i "%xOS%"=="win32" ( set "dl_os=win" ) else ( set "dl_os=win64" )
+if /i "%xOS%"=="win32" (
+  set "dl_os=win32"
+) else if /i "%xOS%"=="win64" (
+  set "dl_os=win64"
+) else if /i "%xOS%"=="winarm" (
+  set "dl_os=win64-aarch64"
+) else (
+  echo ERROR: Unknown architecture "%xOS%"
+  echo ОШИБКА: Неизвестная архитектура "%xOS%"
+  pause & exit /b 1
+)
 
 REM Use Mozilla redirector to always get latest ESR
 set "FF_URL=https://download.mozilla.org/?product=%ESR_PRODUCT%&os=%dl_os%&lang=%locale%"
@@ -71,7 +81,7 @@ if not defined FF_VER (
   echo ОШИБКА: Не удалось прочитать версию Firefox из application.ini
   pause & exit /b
 )
-set "XPI_BASE=https://releases.mozilla.org/pub/firefox/releases/%FF_VER%/xpi"
+set "XPI_BASE=https://releases.mozilla.org/pub/firefox/releases/%FF_VER%/%dl_os%/xpi"
 
 echo.
 echo Patching browser internal files to reduce external requests
