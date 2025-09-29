@@ -16,31 +16,30 @@ call :GET_ARCH
 
 set "ESR_PRODUCT=firefox-esr-latest"
 
-if "%locale%"=="ru" (
-  echo Сборка I2Pd Browser Portable
-  echo Язык браузера: %locale%, архитектура: %xOS%
-  echo.
-  echo Загрузка установщика Firefox ESR
-) else (
-  echo Building I2Pd Browser Portable
-  echo Browser locale: %locale%, architecture: %xOS%
-  echo.
-  echo Downloading Firefox ESR installer
-)
+echo Building I2Pd Browser Portable
+echo Сборка I2Pd Browser Portable
+echo Browser locale: %locale%, architecture: %xOS%
+echo Язык браузера: %locale%, архитектура: %xOS%
+echo.
+echo Downloading Firefox ESR installer
+echo Загрузка установщика Firefox ESR
 
 if /i "%xOS%"=="win32" ( set "dl_os=win" ) else ( set "dl_os=win64" )
 
 REM Use Mozilla redirector to always get latest ESR
 set "FF_URL=https://download.mozilla.org/?product=%ESR_PRODUCT%&os=%dl_os%&lang=%locale%"
 "%CURL%" -L -f -# -o firefox.exe "%FF_URL" %$X%
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else ( echo OK! )
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+) else (
+  echo OK!
+)
 
 echo.
-if "%locale%"=="ru" (
-  echo Распаковка установщика и удаление не нужных файлов
-) else (
-  echo Unpacking the installer and deleting unnecessary files
-)
+echo Unpacking the installer and deleting unnecessary files
+echo Распаковка установщика и удаление ненужных файлов
 "%SEVENZIP%" x -y -o..\Firefox\App firefox.exe >nul
 del /Q firefox.exe
 ren ..\Firefox\App\core Firefox
@@ -49,8 +48,9 @@ del /Q ..\Firefox\App\Firefox\browser\crashreporter-override.ini
 rmdir /S /Q ..\Firefox\App\Firefox\browser\features
 rmdir /S /Q ..\Firefox\App\Firefox\gmp-clearkey
 rmdir /S /Q ..\Firefox\App\Firefox\uninstall
-del /Q ..\Firefox\App\Firefox\Accessible*.*"
-del /Q ..\Firefox\App\Firefox\application.ini
+del /Q "..\Firefox\App\Firefox\Accessible*.*"
+REM Do NOT delete application.ini; we need it to read the exact version and to disable updates
+REM del /Q ..\Firefox\App\Firefox\application.ini
 del /Q ..\Firefox\App\Firefox\crashreporter.*
 del /Q ..\Firefox\App\Firefox\*.sig
 del /Q ..\Firefox\App\Firefox\maintenanceservice*.*
@@ -63,19 +63,38 @@ del /Q ..\Firefox\App\Firefox\update*.*
 mkdir ..\Firefox\App\Firefox\browser\extensions >nul
 echo OK!
 
-echo.
-if "%locale%"=="ru" (
-  echo Патчим внутренние файлы браузера для отключения навязчивых запросов
-) else (
-  echo Patching browser internal files to disable external requests
+REM Read exact version from application.ini
+set "FF_VER="
+for /f "usebackq tokens=2 delims==" %%v in (`findstr /b /i "Version=" "..\Firefox\App\Firefox\application.ini"`) do set "FF_VER=%%v"
+if not defined FF_VER (
+  echo ERROR: Couldn't read Firefox version from application.ini
+  echo ОШИБКА: Не удалось прочитать версию Firefox из application.ini
+  pause & exit /b
 )
+set "XPI_BASE=https://releases.mozilla.org/pub/firefox/releases/%FF_VER%/xpi"
 
+echo.
+echo Patching browser internal files to reduce external requests
+echo Патчинг внутренних файлов браузера для отключения внешних запросов
 "%SEVENZIP%" -bso0 -y x ..\Firefox\App\Firefox\omni.ja -o..\Firefox\App\tmp >nul 2>&1
-
 sed -i "s/https\:\/\/firefox\.settings\.services\.mozilla\.com\/v1/http\:\/\/127\.0\.0\.1/" ..\Firefox\App\tmp\modules\SearchUtils.sys.mjs
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo Patched 1/2)
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+) else (
+  echo Patched 1/2
+  echo Патч 1/2
+)
 sed -i "s/\"https\:\/\/firefox\.settings\.services\.mozilla\.com\/v1\",$/\"\",/" ..\Firefox\App\tmp\modules\AppConstants.sys.mjs
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo Patched 2/2)
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+) else (
+  echo Patched 2/2
+  echo Патч 2/2
+)
 
 ren ..\Firefox\App\Firefox\omni.ja omni.ja.bak
 "%SEVENZIP%" a -mx0 -tzip ..\Firefox\App\Firefox\omni.ja -r ..\Firefox\App\tmp\* >nul
@@ -84,43 +103,80 @@ del ..\Firefox\App\Firefox\omni.ja.bak
 echo OK!
 
 echo.
-if "%locale%"=="ru" (
-  echo Загрузка языковых пакетов
-) else (
-  echo Downloading language packs
-)
+echo Downloading language packs
+echo Загрузка языковых пакетов
+
+REM Always add RU to allow switching from EN
 "%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\langpack-ru@firefox.mozilla.org.xpi ^
-  https://addons.mozilla.org/firefox/downloads/latest/russian-ru-language-pack/latest.xpi
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo OK!)
-"%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\langpack-en-US@firefox.mozilla.org.xpi ^
-  https://addons.mozilla.org/firefox/downloads/latest/english-us-language-pack/latest.xpi
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo OK!)
+  "%XPI_BASE%/ru.xpi"
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+) else (
+  echo OK!
+)
+
+REM Add en-US only if the base build is RU (en-US build doesn't need en-US langpack)
+if /i "%locale%"=="ru" (
+  "%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\langpack-en-US@firefox.mozilla.org.xpi ^
+    "%XPI_BASE%/en-US.xpi"
+  if errorlevel 1 (
+    echo ERROR:%ErrorLevel%
+    echo ОШИБКА:%ErrorLevel%
+    pause & exit
+  ) else (
+    echo OK!
+  )
+)
+
+REM Dictionaries
 "%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\ru@dictionaries.addons.mozilla.org.xpi ^
   https://addons.mozilla.org/firefox/downloads/latest/russian-spellchecking-dic-3703/latest.xpi
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo OK!)
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+) else (
+  echo OK!
+)
 "%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\en-US@dictionaries.addons.mozilla.org.xpi ^
   https://addons.mozilla.org/firefox/downloads/latest/english-us-dictionary/latest.xpi
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo OK!)
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+) else (
+  echo OK!
+)
 
 echo.
-if "%locale%"=="ru" (
-  echo Загрузка дополнения NoScript
-) else (
-  echo Downloading NoScript extension
-)
+echo Downloading NoScript extension
+echo Загрузка дополнения NoScript
 "%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi ^
   https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo OK!)
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+) else (
+  echo OK!
+)
 
 echo.
-if "%locale%"=="ru" (
-  echo Копирование файлов настроек в папку Firefox
-) else (
-  echo Copying Firefox launcher and settings
-)
+echo Disabling auto-updates via application.ini
+echo Отключение автообновлений через application.ini
+sed -i "s/Enabled=1/Enabled=0/g" "..\Firefox\App\Firefox\application.ini"
+if errorlevel 1 ( echo WARN: couldn't set Enabled=0 & echo ВНИМАНИЕ: не удалось выставить Enabled=0 ) else ( echo OK! )
+sed -i "s/ServerURL=.*/ServerURL=-/" "..\Firefox\App\Firefox\application.ini"
+if errorlevel 1 ( echo WARN: couldn't blank ServerURL & echo ВНИМАНИЕ: не удалось очистить ServerURL ) else ( echo OK! )
+
+echo.
+echo Copying Firefox launcher and settings
+echo Копирование файлов настроек Firefox
 mkdir ..\Firefox\App\DefaultData\profile\ >nul
 xcopy /E /Y profile\* ..\Firefox\App\DefaultData\profile\ >nul
-if "%locale%"=="ru" (
+if /i "%locale%"=="ru" (
   copy /Y profile-ru\* ..\Firefox\App\DefaultData\profile\ >nul
 ) else (
   copy /Y profile-en\* ..\Firefox\App\DefaultData\profile\ >nul
@@ -130,16 +186,16 @@ xcopy /E /Y preferences\* ..\Firefox\App\Firefox\ >nul
 echo OK!
 
 echo.
-if "%locale%"=="ru" (
-  echo Загрузка I2Pd
-) else (
-  echo Downloading I2Pd
-)
-
+echo Downloading I2Pd
+echo Загрузка I2Pd
 set "I2PD_URL="
 set "TMP_HTML=%TEMP%\i2pd_latest_%RANDOM%.html"
 "%CURL%" -L -f -s -o "%TMP_HTML%" "https://github.com/PurpleI2P/i2pd/releases/latest"
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit )
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+)
 
 for /f "usebackq delims=" %%L in ("%TMP_HTML%") do (
   set "L=%%L"
@@ -160,43 +216,55 @@ for /f "usebackq delims=" %%L in ("%TMP_HTML%") do (
 :_I2PD_FOUND
 del /Q "%TMP_HTML%" >nul 2>&1
 
-if not defined I2PD_URL ( echo ERROR: couldn't resolve i2pd asset URL & pause & exit )
+if not defined I2PD_URL (
+  echo ERROR: couldn't resolve i2pd asset URL
+  echo ОШИБКА: не удалось найти ссылку на релиз i2pd
+  pause & exit
+)
 
 "%CURL%" -L -f -# -O "%I2PD_URL%"
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo OK!)
+if errorlevel 1 (
+  echo ERROR:%ErrorLevel%
+  echo ОШИБКА:%ErrorLevel%
+  pause & exit
+) else (
+  echo OK!
+)
 
 "%SEVENZIP%" x -y -o..\i2pd "%~nxI2PD_URL%" i2pd.exe >nul
 del /Q "%~nxI2PD_URL%"
 xcopy /E /I /Y i2pd ..\i2pd >nul
 
 echo.
-if "%locale%"=="ru" (
-  echo I2Pd Browser Portable готов к запуску!
-) else (
-  echo I2Pd Browser Portable is ready to start!
-)
+echo I2Pd Browser Portable is ready to start!
+echo I2Pd Browser Portable готов к запуску!
 if not defined arg_skipwait pause
 exit /b
 
 :GET_LOCALE
+REM Detect ru (Russian layout); otherwise default to en-US
 for /f "tokens=3" %%a in ('reg query "HKEY_USERS\.DEFAULT\Keyboard Layout\Preload"^|find "REG_SZ"') do (
   if %%a==00000419 (set locale=ru) else (set locale=en-US)
   goto :eof
 )
+set locale=en-US
 goto :eof
 
 :GET_PROXY
+REM Pick up system proxy for curl if enabled
 set $X=&set $R=HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings
 for /F "Tokens=1,3" %%i in ('reg query "%$R%"^|find "Proxy"') do set %%i=%%j
 if "%ProxyEnable%"=="0x1" set "$X=-x %ProxyServer%"
 goto :eof
 
 :GET_ARCH
+REM Determine 32/64-bit for downloading the correct installer
 set xOS=win32
 if defined PROCESSOR_ARCHITEW6432 (set xOS=win64) else if /i "%PROCESSOR_ARCHITECTURE%" NEQ "x86" (set xOS=win64)
 goto :eof
 
 :GET_ARGS
+REM Optional: --skipwait to avoid final pause
 set arg_skipwait=
 for %%a in (%*) do (
   if "%%a"=="--skipwait" set arg_skipwait=yes

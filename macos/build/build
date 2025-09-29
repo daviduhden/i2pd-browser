@@ -9,45 +9,52 @@ set -e
 dir=${0%/*}; [ "$dir" = "$0" ] && dir="."
 cd "$dir"
 
-arch=$(uname -m)
-language=$(osascript -e 'user locale of (get system info)' | sed -e 's/_/-/g')
-[ "$language" = "ru" ] || language="en-US"
+# Locale: choose ru or en-US for the Firefox build to download
+locale_raw="$(osascript -e 'user locale of (get system info)' 2>/dev/null || echo en_US)"
+case "$(printf '%s' "$locale_raw" | tr '[:upper:]' '[:lower:]')" in
+  ru* ) fx_lang="ru" ;;
+  *   ) fx_lang="en-US" ;;
+esac
+
 : "${ESR_PRODUCT:=firefox-esr-latest}"
 
 curl -V >/dev/null 2>&1 || { echo "'cURL' is required."; exit 1; }
 
 echo "Preparing Firefox ESR for I2Pd..."
 final_url=$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
-  "https://download.mozilla.org/?product=${ESR_PRODUCT}&os=osx&lang=${language}")
+  "https://download.mozilla.org/?product=${ESR_PRODUCT}&os=osx&lang=${fx_lang}")
 [ -n "$final_url" ] || { echo "[Error] Couldn't resolve Firefox URL."; exit 1; }
 
 file=$(basename "$final_url")
 echo "Downloading: $file"
 curl -L -f -# -o "$file" "$final_url"
 
-# Derive version & verify checksum
+# Derive version from the DMG filename (e.g., "Firefox 140.3.1esr.dmg")
 version=$(printf "%s" "$file" | sed -E 's/^Firefox ([^ ]+)\.dmg$/\1/')
+[ -n "$version" ] || { echo "[Error] Couldn't parse Firefox version."; exit 1; }
+
+# Verify checksum against official mirror
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/${version}"
-filepath="mac/${language}/${file// /%20}"
+filepath="mac/${fx_lang}/${file// /%20}"
 
 echo "Downloading SHA512SUMS and verifying..."
 curl -L -f -# -O "${ftpmirror}/SHA512SUMS"
-recv_sum=$(grep "mac/${language}/${file}" SHA512SUMS | cut -c-128)
+recv_sum=$(grep "mac/${fx_lang}/${file}" SHA512SUMS | cut -c-128)
 file_sum=$(shasum -a 512 "$file" | cut -c-128)
-[ "$recv_sum" = "$file_sum" ] || { echo "[Error] File checksum failed!"; exit 1; }
+[ "$recv_sum" = "$file_sum" ] || { echo "[Error] File checksum failed!"; rm -f SHA512SUMS; exit 1; }
 rm -f SHA512SUMS
 echo "Checksum OK."
 
 echo "Attaching image and copying files..."
-hdiutil attach "$file"
+hdiutil attach "$file" -quiet
 cp -r /Volumes/Firefox/Firefox.app ../FirefoxESR.app
 mkdir -p ../data
 
 echo "Detaching image and removing image file..."
-hdiutil detach /Volumes/Firefox
+hdiutil detach /Volumes/Firefox -quiet
 rm -f "$file"
 
-# Remove unneeded bits
+# Remove unneeded files
 rm -rf ../FirefoxESR.app/Contents/Library
 rm -rf ../FirefoxESR.app/Contents/MacOS/crashreporter.app
 rm -f  ../FirefoxESR.app/Contents/MacOS/pingsender
@@ -60,15 +67,26 @@ rm -f  ../FirefoxESR.app/Contents/Resources/removed-files
 rm -f  ../FirefoxESR.app/Contents/Resources/update*
 
 # Disable updates
-sed -i '' -e 's/Enabled=1/Enabled=0/g' "../FirefoxESR.app/Contents/Resources/application.ini"
-sed -i '' -e 's/ServerURL=.*/ServerURL=-/' "../FirefoxESR.app/Contents/Resources/application.ini"
+sed -i '' -e 's/Enabled=1/Enabled=0/g' "../FirefoxESR.app/Contents/Resources/application.ini" || true
+sed -i '' -e 's/ServerURL=.*/ServerURL=-/' "../FirefoxESR.app/Contents/Resources/application.ini" || true
 
 echo "Downloading language packs & dictionaries..."
 mkdir -p ../FirefoxESR.app/Contents/Resources/browser/extensions
+
+# Version-pinned language packs (match exact Firefox version)
+xpi_base="https://releases.mozilla.org/pub/firefox/releases/${version}/xpi"
+
+# Always add RU so users can switch from EN
 curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/langpack-ru@firefox.mozilla.org.xpi \
-  "https://addons.mozilla.org/firefox/downloads/latest/russian-ru-language-pack/latest.xpi"
-curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/langpack-en-US@firefox.mozilla.org.xpi \
-  "https://addons.mozilla.org/firefox/downloads/latest/english-us-language-pack/latest.xpi"
+  "${xpi_base}/ru.xpi"
+
+# Add en-US only if base build is RU
+if [ "$fx_lang" = "ru" ]; then
+  curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/langpack-en-US@firefox.mozilla.org.xpi \
+    "${xpi_base}/en-US.xpi"
+fi
+
+# Dictionaries (not version-locked)
 curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/ru@dictionaries.addons.mozilla.org.xpi \
   "https://addons.mozilla.org/firefox/downloads/latest/russian-spellchecking-dic-3703/latest.xpi"
 curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/en-US@dictionaries.addons.mozilla.org.xpi \
@@ -81,7 +99,7 @@ curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/{73a6fe
 echo "Adding standard configs..."
 cp -r preferences/* ../FirefoxESR.app/Contents/Resources/
 cp -r profile/* ../data/
-if [ "$language" = "ru" ]; then
+if [ "$fx_lang" = "ru" ]; then
   cp -r profile-ru/* ../data/
 else
   cp -r profile-en/* ../data/
