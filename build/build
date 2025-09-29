@@ -49,7 +49,7 @@ case "$arch" in
 	*)
 		die "Your system architecture is not supported: $arch"
 		;;
-endesac
+esac
 
 echo "Discovering the latest Firefox ESR for $fx_os ($arch), language: $language ..."
 final_url="$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
