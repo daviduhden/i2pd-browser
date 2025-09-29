@@ -15,7 +15,6 @@
     "DisableFirefoxScreenshots": true,
     "DisableFirefoxStudies": true,
     "DisablePasswordReveal": true,
-    "DisablePocket": true,
     "DisableProfileImport": true,
     "DisableProfileRefresh": true,
     "DisableSafeMode": true,
@@ -34,10 +33,8 @@
       "Pocket": false,
       "Search": true,
       "Snippets": false,
-      "TopSites": true
-    },
-    "FlashPlugin": {
-      "Default": false
+      "TopSites": false,
+      "SponsoredTopSites": false
     },
     "NetworkPrediction": false,
     "NoDefaultBookmarks": true,
@@ -45,19 +42,12 @@
     "OverrideFirstRunPage": "http://i2pd.i2p/",
     "OverridePostUpdatePage": "",
     "Permissions": {
-      "Camera": {
-        "BlockNewRequests": true
-      },
-      "Location": {
-        "BlockNewRequests": true
-      },
-      "Microphone": {
-        "BlockNewRequests": true
-      }
+      "Camera": { "BlockNewRequests": true },
+      "Location": { "BlockNewRequests": true },
+      "Microphone": { "BlockNewRequests": true }
     },
-    "PopupBlocking": {
-      "Default": true
-    },
+    "PopupBlocking": { "Default": true },
+
     "Preferences": {
       "browser.cache.disk.enable": true,
       "browser.fixup.dns_first_for_single_words": false,
@@ -73,8 +63,19 @@
       "network.IDN_show_punycode": false,
       "network.dns.disableIPv6": true,
       "places.history.enabled": true,
-      "privacy.file_unique_origin": true
+      "privacy.file_unique_origin": true,
+      "browser.ml.chat.enabled": false,
+      "browser.ml.chat.menu": false,
+      "browser.ml.chat.sidebar": false,
+      "browser.ml.chat.page": false,
+      "browser.ml.chat.page.menuBadge": false,
+      "browser.ml.chat.page.footerBadge": false,
+      "browser.ml.chat.shortcuts": false,
+      "browser.ml.chat.shortcuts.custom": false,
+      "browser.tabs.groups.smart.enabled": false,
+      "sidebar.notification.badge.aichat": false
     },
+
     "PromptForDownloadLocation": true,
     "Proxy": {
       "AutoLogin": true,

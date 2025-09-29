@@ -1,142 +1,111 @@
 #!/bin/sh
 
-# Copyright (c) 2013-2024, The PurpleI2P Project
+# Copyright (c) 2013-2025, The PurpleI2P Project
 # This file is part of Purple I2P project and licensed under BSD3
 # See full license text in LICENSE file at top of project tree
 
-dir=${0%/*}
-if [ "$dir" = "$0" ]; then
-  dir="."
-fi
-cd $dir
+set -e
+
+dir=${0%/*}; [ "$dir" = "$0" ] && dir="."
+cd "$dir"
 
 arch=$(uname -m)
 language=$(osascript -e 'user locale of (get system info)' | sed -e 's/_/-/g')
-version="115.20.0esr"
-i2pdversion="2.56.0"
+[ "$language" = "ru" ] || language="en-US"
+: "${ESR_PRODUCT:=firefox-esr-latest}"
 
+curl -V >/dev/null 2>&1 || { echo "'cURL' is required."; exit 1; }
+
+echo "Preparing Firefox ESR for I2Pd..."
+final_url=$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
+  "https://download.mozilla.org/?product=${ESR_PRODUCT}&os=osx&lang=${language}")
+[ -n "$final_url" ] || { echo "[Error] Couldn't resolve Firefox URL."; exit 1; }
+
+file=$(basename "$final_url")
+echo "Downloading: $file"
+curl -L -f -# -o "$file" "$final_url"
+
+# Derive version & verify checksum
+version=$(printf "%s" "$file" | sed -E 's/^Firefox ([^ ]+)\.dmg$/\1/')
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/${version}"
+filepath="mac/${language}/${file// /%20}"
 
-curlfind=$(which curl)
-if [ -z $curlfind ]; then
-	echo "'cURL' does not seem to be installed. The script needs it!"
-	exit 1
-fi
-
-# We support only English (US) and Russian
-if [ "$language" != "ru" ]; then
-	language="en-US"
-fi
-
-echo "This script is preparing Firefox $version for use with I2Pd"
-
-file="Firefox ${version}.dmg"
-filepath="mac/${language}/${file}"
-
-echo "Downloading $application..."
-
-tmpfilepath=$(echo $filepath | sed 's/ /%20/g')
-curl -L -f -# -o "${file}" "${ftpmirror}/${tmpfilepath}"
-if [ $? -ne 0 ]; then # Not found error, trying to cut language variable
-	echo "[TRY 2] I'll try downloading Firefox with shorter language code"
-	language=$(echo $language | cut -c-2)
-	# re-create variable with cutted lang
-	filepath="mac/$language/$file"
-	tmpfilepath=$(echo $filepath | sed 's/ /%20/g')
-	curl -L -f -# -o "${file}" "${ftpmirror}/${tmpfilepath}"
-	if [ $? -ne 0 ]; then # Not found error, trying to download english version
-		echo "[TRY 3] I'll try downloading Firefox with the English language code"
-		language="en_US"
-		# re-create lang variable
-		filepath="mac/$language/$file"
-		tmpfilepath=$(echo $filepath | sed 's/ /%20/g')
-		curl -L -f -# -o "${file}" "${ftpmirror}/${tmpfilepath}"
-		if [ $? -ne 0 ]; then # After that i can say only that user haven't internet connection
-			echo "[Error] Can't download file. Check your internet connectivity."
-			exit 1
-		fi
-	fi
-fi
-
-if [ ! -f "$file" ]; then
-	echo "[Error] Can't find downloaded file. Does it really exist?"
-	exit 1
-fi
-
-echo "Downloading checksum file and checking SHA512 checksum"
+echo "Downloading SHA512SUMS and verifying..."
 curl -L -f -# -O "${ftpmirror}/SHA512SUMS"
-recv_sum=$(grep "$filepath" SHA512SUMS | cut -c-128)
+recv_sum=$(grep "mac/${language}/${file}" SHA512SUMS | cut -c-128)
 file_sum=$(shasum -a 512 "$file" | cut -c-128)
-if [ $recv_sum != $file_sum ]; then
-	echo "[Error] File checksum failed!"
-	exit 1
-else
-	echo "Checksum correct."
-	rm SHA512SUMS
-fi
+[ "$recv_sum" = "$file_sum" ] || { echo "[Error] File checksum failed!"; exit 1; }
+rm -f SHA512SUMS
+echo "Checksum OK."
 
 echo "Attaching image and copying files..."
 hdiutil attach "$file"
 cp -r /Volumes/Firefox/Firefox.app ../FirefoxESR.app
-mkdir ../data
+mkdir -p ../data
 
 echo "Detaching image and removing image file..."
 hdiutil detach /Volumes/Firefox
-rm "$file"
+rm -f "$file"
 
-## TODO: check on linux before make that changes
-# Deleting some not needed files
-rm -r ../FirefoxESR.app/Contents/Library
-rm -r ../FirefoxESR.app/Contents/MacOS/crashreporter.app
-rm ../FirefoxESR.app/Contents/MacOS/pingsender
-rm -r ../FirefoxESR.app/Contents/MacOS/updater.app
-rm ../FirefoxESR.app/Contents/Resources/browser/crashreporter-override.ini
-rm ../FirefoxESR.app/Contents/Resources/browser/features/formautofill@mozilla.org.xpi
-rm ../FirefoxESR.app/Contents/Resources/browser/features/screenshots@mozilla.org.xpi
-rm ../FirefoxESR.app/Contents/Resources/precomplete
-rm ../FirefoxESR.app/Contents/Resources/removed-files
-rm ../FirefoxESR.app/Contents/Resources/update*
-# And edit some places
-sed -i '' -e "s/Enabled=1/Enabled=0/g" "../FirefoxESR.app/Contents/Resources/application.ini"
-sed -i '' -e "s/ServerURL=.*/ServerURL=-/" "../FirefoxESR.app/Contents/Resources/application.ini"
-# Done!
+# Remove unneeded bits
+rm -rf ../FirefoxESR.app/Contents/Library
+rm -rf ../FirefoxESR.app/Contents/MacOS/crashreporter.app
+rm -f  ../FirefoxESR.app/Contents/MacOS/pingsender
+rm -rf ../FirefoxESR.app/Contents/MacOS/updater.app
+rm -f  ../FirefoxESR.app/Contents/Resources/browser/crashreporter-override.ini
+rm -f  ../FirefoxESR.app/Contents/Resources/browser/features/formautofill@mozilla.org.xpi
+rm -f  ../FirefoxESR.app/Contents/Resources/browser/features/screenshots@mozilla.org.xpi
+rm -f  ../FirefoxESR.app/Contents/Resources/precomplete
+rm -f  ../FirefoxESR.app/Contents/Resources/removed-files
+rm -f  ../FirefoxESR.app/Contents/Resources/update*
 
-echo "Downloading language packs..."
-mkdir ../FirefoxESR.app/Contents/Resources/browser/extensions
-curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/langpack-ru@firefox.mozilla.org.xpi https://addons.mozilla.org/firefox/downloads/file/4144376/russian_ru_language_pack-115.0.20230726.201356.xpi
-curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/ruspell-wiktionary@addons.mozilla.org.xpi https://addons.mozilla.org/firefox/downloads/file/4215701/2696307-1.77.xpi
-curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/langpack-en-US@firefox.mozilla.org.xpi https://addons.mozilla.org/firefox/downloads/file/4144407/english_us_language_pack-115.0.20230726.201356.xpi
-curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/en-US@dictionaries.addons.mozilla.org.xpi https://addons.mozilla.org/firefox/downloads/file/4175230/us_english_dictionary-115.0.xpi
+# Disable updates
+sed -i '' -e 's/Enabled=1/Enabled=0/g' "../FirefoxESR.app/Contents/Resources/application.ini"
+sed -i '' -e 's/ServerURL=.*/ServerURL=-/' "../FirefoxESR.app/Contents/Resources/application.ini"
 
-echo "Downloading NoScript extension..."
-curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi https://addons.mozilla.org/firefox/downloads/file/4411102/noscript-12.1.1.xpi
+echo "Downloading language packs & dictionaries..."
+mkdir -p ../FirefoxESR.app/Contents/Resources/browser/extensions
+curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/langpack-ru@firefox.mozilla.org.xpi \
+  "https://addons.mozilla.org/firefox/downloads/latest/russian-ru-language-pack/latest.xpi"
+curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/langpack-en-US@firefox.mozilla.org.xpi \
+  "https://addons.mozilla.org/firefox/downloads/latest/english-us-language-pack/latest.xpi"
+curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/ru@dictionaries.addons.mozilla.org.xpi \
+  "https://addons.mozilla.org/firefox/downloads/latest/russian-spellchecking-dic-3703/latest.xpi"
+curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/en-US@dictionaries.addons.mozilla.org.xpi \
+  "https://addons.mozilla.org/firefox/downloads/latest/english-us-dictionary/latest.xpi"
+
+echo "Downloading NoScript..."
+curl -L -f -# -o ../FirefoxESR.app/Contents/Resources/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi \
+  "https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
 
 echo "Adding standard configs..."
 cp -r preferences/* ../FirefoxESR.app/Contents/Resources/
 cp -r profile/* ../data/
-
 if [ "$language" = "ru" ]; then
-	cp -r profile-ru/* ../data/
+  cp -r profile-ru/* ../data/
 else
-	cp -r profile-en/* ../data/
+  cp -r profile-en/* ../data/
 fi
 
-echo '#!/bin/sh' > "../i2pdbrowser-portable"
-echo 'dir=${0%/*}' >> "../i2pdbrowser-portable"
-echo 'if [ "$dir" = "$0" ]; then' >> "../i2pdbrowser-portable"
-echo '  dir="."' >> "../i2pdbrowser-portable"
-echo 'fi' >> "../i2pdbrowser-portable"
-echo 'cd $dir' >> "../i2pdbrowser-portable"
-echo 'FirefoxESR.app/Contents/MacOS/firefox -profile data -no-remote' >> "../i2pdbrowser-portable"
-
+# Launcher
+cat > "../i2pdbrowser-portable" <<'EOF'
+#!/bin/sh
+dir=${0%/*}; [ "$dir" = "$0" ] && dir="."
+cd "$dir"
+FirefoxESR.app/Contents/MacOS/firefox -profile data -no-remote
+EOF
 chmod +x "../i2pdbrowser-portable"
 
 echo "Downloading i2pd..."
-curl -L -f -# -O "https://github.com/PurpleI2P/i2pd/releases/download/${i2pdversion}/i2pd_${i2pdversion}_osx.tar.gz"
-mkdir ../i2pd
-tar xfz i2pd_${i2pdversion}_osx.tar.gz -C ../i2pd
+i2pd_url=$(curl -s https://api.github.com/repos/PurpleI2P/i2pd/releases/latest | \
+  grep -oE '"browser_download_url":\s*"[^"]+osx\.tar\.gz"' | sed -E 's/.*"([^"]+)".*/\1/' | head -n1)
+[ -n "$i2pd_url" ] || { echo "[Error] Couldn't find i2pd osx tarball."; exit 1; }
+
+curl -L -f -# -O "$i2pd_url"
+mkdir -p ../i2pd
+tar xfz "$(basename "$i2pd_url")" -C ../i2pd
 mv ../i2pd/i2pd ../i2pd/i2pd-osx
 cp -rf i2pd/* ../i2pd
-rm "i2pd_${i2pdversion}_osx.tar.gz"
+rm -f "$(basename "$i2pd_url")"
 
 echo "... finished"
