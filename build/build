@@ -16,7 +16,7 @@ die() { echo "[Error] $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "'$1' is required but not installed."; }
 
 # Change to the directory where this script lives
-dir="$(cd "$(dirnam "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)"
+dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)"
 cd "$dir" || die "Could not access the script directory: $dir"
 
 # Detect system architecture
