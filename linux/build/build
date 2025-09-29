@@ -82,7 +82,7 @@ echo "Downloading language packs & dictionaries..."
 mkdir -p ../browser/browser/extensions
 
 # Version-pinned language packs (match the exact Firefox you downloaded)
-xpi_base="https://releases.mozilla.org/pub/firefox/releases/${version}/${fx_os}/xpi"
+xpi_base="https://releases.mozilla.org/pub/firefox/releases/${version}/${fx_dir}/xpi"
 
 # Always add RU so users can switch from EN
 curl -L -f -# -o ../browser/browser/extensions/langpack-ru@firefox.mozilla.org.xpi \
