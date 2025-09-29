@@ -16,7 +16,7 @@ die() { echo "[Error] $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "'$1' is required but not installed."; }
 
 # Change to the directory where this script lives
-dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)"
+dir="$(cd "$(dirnam "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)"
 cd "$dir" || die "Could not access the script directory: $dir"
 
 # Detect system architecture
@@ -57,7 +57,7 @@ final_url="$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
 
 [[ -n "$final_url" ]] || die "Could not resolve the Firefox download URL via the redirector."
 
-file="$(basename -- "$final_url")"
+file="$(basename "$final_url")"
 
 # Try to extract the version from the filename
 if [[ "$file" =~ ^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$ ]]; then
@@ -83,7 +83,7 @@ curl -L -f -# -O "$ftpmirror/SHA512SUMS" || die "Could not download SHA512SUMS."
 
 # Get the expected checksum from the line whose last field matches $filepath
 recv_sum="$(awk -v f="$filepath" '$NF==f {print $1; exit}' SHA512SUMS)"
-file_sum="$(sha512sum -- "$file" | awk '{print $1}')"
+file_sum="$(sha512sum "$file" | awk '{print $1}')"
 
 if [[ -z "$recv_sum" || "$recv_sum" != "$file_sum" ]]; then
 	die "Checksum verification failed!"
@@ -96,11 +96,11 @@ fi
 echo "Extracting the archive, please wait..."
 [[ -d ../browser ]] && rm -rf ../browser
 case "$file" in
-	*.tar.xz)  tar xJf -- "$file" ;;
-	*.tar.bz2) tar xjf -- "$file" ;;
-	*)         tar xf  -- "$file"  ;;
+	*.tar.xz)  tar xJf "$file" ;;
+	*.tar.bz2) tar xjf "$file" ;;
+	*)         tar xf  "$file"  ;;
 esac
-rm -f -- "$file"
+rm -f "$file"
 mv firefox ../browser
 mkdir -p ../browser/data
 
