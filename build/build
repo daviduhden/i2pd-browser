@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # See the LICENSE file at the top of the project tree for copyright and license details.
 #
@@ -7,25 +7,34 @@
 # extracts it, removes unnecessary files, updates configuration settings and extensions,
 # and finally copies necessary scripts and configurations for the I2Pd Browser.
 
-set -e
+set -Eeuo pipefail
 
-# Set the directory to the script's location
-dir=$(dirname "$0")
-cd "$dir" || exit 1
+trap 'echo "[Error] A problem occurred on line $LINENO." >&2' ERR
 
-# Detect the system architecture
-arch=$(uname -m)
+# Helper functions
+die() { echo "[Error] $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "'$1' is required but not installed."; }
 
-# ---- Config ----
+# Change to the directory where this script lives
+dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)"
+cd "$dir" || die "Could not access the script directory: $dir"
+
+# Detect system architecture
+arch="$(uname -m)"
+
+# Configuration
 language="${language:-en-US}"
 ESR_PRODUCT="${ESR_PRODUCT:-firefox-esr-latest}"
 
-# Check if required tools exist
-command -v curl >/dev/null 2>&1 || { echo "'cURL' does not seem to be installed. The script needs it!"; exit 1; }
-command -v sha512sum >/dev/null 2>&1 || { echo "'sha512sum' is required for integrity verification."; exit 1; }
-command -v grep >/dev/null 2>&1 || { echo "'grep' is required."; exit 1; }
+# Check required tools
+need curl
+need sha512sum
+need grep
+need sed
+need tar
+need awk
 
-# Map arch for redirector (os=) and for the checksums path (linux-*)
+# Map architecture for redirector (os=) and for checksums path (linux-*)
 case "$arch" in
 	amd64|x86_64)
 		arch=x86_64
@@ -38,59 +47,46 @@ case "$arch" in
 		fx_dir="linux-i686"
 		;;
 	*)
-		echo "Your system architecture is not supported."
-		exit 1
+		die "Your system architecture is not supported: $arch"
 		;;
-esac
+endesac
 
-echo "Discovering latest Firefox ESR for $fx_os ($arch), lang: $language ..."
-final_url=$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
-	"https://download.mozilla.org/?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")
+echo "Discovering the latest Firefox ESR for $fx_os ($arch), language: $language ..."
+final_url="$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
+	"https://download.mozilla.org/?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")" || die "Failed to query the redirector."
 
-if [ -z "$final_url" ]; then
-	echo "[Error] Couldn't resolve Firefox download URL via redirector."
-	exit 1
-fi
+[[ -n "$final_url" ]] || die "Could not resolve the Firefox download URL via the redirector."
 
-file=$(basename "$final_url")
-# Try to extract version from filename
-version=$(printf "%s" "$file" | sed -E 's/^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$/\1/')
+file="$(basename -- "$final_url")"
 
-if [ -z "$version" ]; then
-	echo "[Error] Couldn't parse version from filename: $file"
-	exit 1
+# Try to extract the version from the filename
+if [[ "$file" =~ ^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$ ]]; then
+	version="${BASH_REMATCH[1]}"
+else
+	die "Could not parse the version from filename: $file"
 fi
 
 ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
 filepath="$fx_dir/$language/$file"
 
-echo "This script is preparing Firefox version $version for its use with I2Pd"
+echo "This script will prepare Firefox version $version for use with I2Pd."
 
 # Download Firefox (from the resolved final URL)
 echo "Downloading Firefox $version..."
-curl -L -f -# -O "$final_url" || {
-	echo "[Error] Can't download file. Check your internet connectivity."
-	exit 1
-}
+curl -L -f -# -O "$final_url" || die "Could not download the file. Check your internet connection."
 
-# Verify the downloaded file exists
-if [ ! -f "$file" ]; then
-	echo "[Error] Can't find downloaded file. Does it really exist?"
-	exit 1
-fi
+[[ -f "$file" ]] || die "Downloaded file not found: $file"
 
-# Download and check the checksum file
-echo "Downloading checksum file and checking SHA512 checksum"
-curl -L -f -# -O "$ftpmirror/SHA512SUMS" || {
-	echo "[Error] Can't download SHA512SUMS."
-	exit 1
-}
-# Use an anchored grep to reduce ambiguity
-recv_sum=$(grep " $filepath\$" SHA512SUMS | cut -c-128)
-file_sum=$(sha512sum "$file" | cut -c-128)
-if [ "$recv_sum" != "$file_sum" ] || [ -z "$recv_sum" ]; then
-	echo "[Error] File checksum failed!"
-	exit 1
+# Download and verify the checksums file
+echo "Downloading checksums and verifying SHA512..."
+curl -L -f -# -O "$ftpmirror/SHA512SUMS" || die "Could not download SHA512SUMS."
+
+# Get the expected checksum from the line whose last field matches $filepath
+recv_sum="$(awk -v f="$filepath" '$NF==f {print $1; exit}' SHA512SUMS)"
+file_sum="$(sha512sum -- "$file" | awk '{print $1}')"
+
+if [[ -z "$recv_sum" || "$recv_sum" != "$file_sum" ]]; then
+	die "Checksum verification failed!"
 else
 	echo "Checksum correct."
 	rm -f SHA512SUMS
@@ -98,13 +94,13 @@ fi
 
 # Extract the downloaded archive
 echo "Extracting the archive, please wait..."
-[ -d "../browser" ] && rm -r ../browser
+[[ -d ../browser ]] && rm -rf ../browser
 case "$file" in
-	*.tar.xz)  tar xJf "$file" ;;
-	*.tar.bz2) tar xjf "$file" ;;
-	*)         tar xf "$file"  ;;
+	*.tar.xz)  tar xJf -- "$file" ;;
+	*.tar.bz2) tar xjf -- "$file" ;;
+	*)         tar xf  -- "$file"  ;;
 esac
-rm "$file"
+rm -f -- "$file"
 mv firefox ../browser
 mkdir -p ../browser/data
 
@@ -130,7 +126,7 @@ sed -i 's/ServerURL=.*/ServerURL=-/' ../browser/application.ini || true
 # Download the NoScript extension
 echo "Downloading the NoScript extension..."
 mkdir -p ../browser/browser/extensions
-curl -L -f -# -o ../browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi \
+curl -L -f -# -o ../browser/browser/extensions/\{73a6fe31-595d-460b-a920-fcc0f8843232\}.xpi \
 	"https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
 
 # Add standard configuration files
@@ -139,7 +135,7 @@ cp -r preferences/* ../browser/
 cp -r profile/* ../browser/data/
 
 # Copy desktop launch scripts
-echo "Copying the desktop launching scripts..."
+echo "Copying desktop launch scripts..."
 cp -r scripts/* ../browser/
 cp scripts/start-i2pd-browser.desktop ../
 
