@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # See the LICENSE file at the top of the project tree for copyright and license details.
 
@@ -6,19 +6,33 @@
 # The program is specified in the line that starts with 'X-I2PdBrowser-ExecShell'
 # The line is processed to remove the prefix and any trailing characters
 
-I2PDB_START_PROG=$(grep '^X-I2PdBrowser-ExecShell' "$1" | tail -1 | sed 's/^X-I2PdBrowser-ExecShell=//' | sed 's/%.//')
+set -Eeuo pipefail
+trap 'echo "[Error] A problem occurred on line $LINENO." >&2' ERR
 
-# Shift the positional parameters to the left, discarding the first parameter
+if [[ $# -lt 1 ]]; then
+	echo "Usage: $0 <desktop-file> [args...]"
+	exit 1
+fi
+
+desktop_file="$1"
+
+# Extract the command from the desktop file
+I2PDB_START_PROG="$(
+	grep '^X-I2PdBrowser-ExecShell' "$desktop_file" | tail -1 \
+		| sed 's/^X-I2PdBrowser-ExecShell=//' \
+		| sed 's/%.//'
+)"
+
+# Discard the first parameter (the desktop file)
 shift
 
-# Check if there are additional arguments
-if [ "$#" -ge 1 ]; then
-	# If there are additional arguments, include them in the launch command
-	echo "Launching '${I2PDB_START_PROG} $@'..."
+# Announce launch
+if [[ "$#" -ge 1 ]]; then
+	echo "Launching '${I2PDB_START_PROG} $*'..."
 else
-	# If there are no additional arguments, just launch the program
 	echo "Launching '${I2PDB_START_PROG}'..."
 fi
 
 # Execute the startup program with any additional arguments
+# (Intentionally unquoted command to allow exec of a simple path; arguments remain quoted)
 ${I2PDB_START_PROG} "$@"
