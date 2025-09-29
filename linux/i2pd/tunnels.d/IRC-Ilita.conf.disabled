@@ -5,3 +5,4 @@ port = 6669
 destination = irc.ilita.i2p
 destinationport = 6667
 keys = irc-keys.dat
+i2p.streaming.profile=2
