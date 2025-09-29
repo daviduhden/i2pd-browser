@@ -1,114 +1,101 @@
 {
 	"policies": {
-	"AppUpdateURL": "http://127.0.0.1/",
-	"CaptivePortal": false,
-	"Certificates": {
-		"ImportEnterpriseRoots": false
-	},
-	"DNSOverHTTPS": {
-		"Enabled": false,
-		"Locked": true
-	},
-	"DisableAppUpdate": true,
-	"DisableFeedbackCommands": true,
-	"DisableFirefoxAccounts": true,
-	"DisableFirefoxScreenshots": true,
-	"DisableFirefoxStudies": true,
-	"DisablePasswordReveal": true,
-	"DisablePocket": true,
-	"DisableProfileImport": true,
-	"DisableProfileRefresh": true,
-	"DisableSafeMode": true,
-	"DisableSetDesktopBackground": true,
-	"DisableSystemAddonUpdate": true,
-	"DisableTelemetry": true,
-	"DontCheckDefaultBrowser": true,
+		"AppUpdateURL": "http://127.0.0.1/",
+		"CaptivePortal": false,
+		"Certificates": {
+			"ImportEnterpriseRoots": false
+		},
+		"DNSOverHTTPS": {
+			"Enabled": false,
+			"Locked": true
+		},
+		"DisableAppUpdate": true,
+		"DisableFeedbackCommands": true,
+		"DisableFirefoxAccounts": true,
+		"DisableFirefoxScreenshots": true,
+		"DisableFirefoxStudies": true,
+		"DisablePasswordReveal": true,
+		"DisableProfileImport": true,
+		"DisableProfileRefresh": true,
+		"DisableSafeMode": true,
+		"DisableSetDesktopBackground": true,
+		"DisableSystemAddonUpdate": true,
+		"DisableTelemetry": true,
+		"DontCheckDefaultBrowser": true,
+		"ExtensionUpdate": false,
+		"Extensions": {
+			"Locked": [
+				"73a6fe31-595d-460b-a920-fcc0f8843232"
+			]
+		},
+		"FirefoxHome": {
+			"Highlights": false,
+			"Pocket": false,
+			"Search": true,
+			"Snippets": false,
+			"TopSites": false,
+			"SponsoredTopSites": false
+		},
+		"NetworkPrediction": false,
+		"NoDefaultBookmarks": true,
+		"OfferToSaveLoginsDefault": false,
+		"OverrideFirstRunPage": "http://i2pd.i2p/",
+		"OverridePostUpdatePage": "",
+		"Permissions": {
+			"Camera": { "BlockNewRequests": true },
+			"Location": { "BlockNewRequests": true },
+			"Microphone": { "BlockNewRequests": true }
+		},
+		"PopupBlocking": { "Default": true },
 
-	"ExtensionUpdate": false,
-	"Extensions": {
-		"Locked": [
-		"73a6fe31-595d-460b-a920-fcc0f8843232"
-		]
-	},
+		"Preferences": {
+			"browser.cache.disk.enable": true,
+			"browser.fixup.dns_first_for_single_words": false,
+			"browser.search.update": false,
+			"browser.tabs.warnOnClose": false,
+			"browser.urlbar.suggest.bookmark": true,
+			"browser.urlbar.suggest.history": true,
+			"browser.urlbar.suggest.openpage": true,
+			"datareporting.policy.dataSubmissionPolicyBypassNotification": true,
+			"dom.disable_window_flip": true,
+			"dom.disable_window_move_resize": true,
+			"dom.event.contextmenu.enabled": false,
+			"network.IDN_show_punycode": false,
+			"network.dns.disableIPv6": true,
+			"places.history.enabled": true,
+			"privacy.file_unique_origin": true,
+			"browser.ml.chat.enabled": false,
+			"browser.ml.chat.menu": false,
+			"browser.ml.chat.sidebar": false,
+			"browser.ml.chat.page": false,
+			"browser.ml.chat.page.menuBadge": false,
+			"browser.ml.chat.page.footerBadge": false,
+			"browser.ml.chat.shortcuts": false,
+			"browser.ml.chat.shortcuts.custom": false,
+			"browser.tabs.groups.smart.enabled": false,
+			"sidebar.notification.badge.aichat": false
+		},
 
-	"FirefoxHome": {
-		"Highlights": false,
-		"Pocket": false,
-		"Search": true,
-		"Snippets": false,
-		"TopSites": false
-	},
-
-	"NoDefaultBookmarks": true,
-	"OfferToSaveLoginsDefault": false,
-	"OverrideFirstRunPage": "http://i2pd.i2p/",
-	"OverridePostUpdatePage": "",
-
-	"Permissions": {
-		"Camera": { "BlockNewRequests": true, "Locked": true },
-		"Location": { "BlockNewRequests": true, "Locked": true },
-		"Microphone": { "BlockNewRequests": true, "Locked": true },
-		"Autoplay": { "Default": "block-audio-video", "Locked": true }
-	},
-
-	"PopupBlocking": { "Default": true },
-
-	"Proxy": {
-		"AutoLogin": true,
-		"Mode": "manual",
-		"HTTPProxy": "127.0.0.1:4444",
-		"SSLProxy": "127.0.0.1:4444",
-		"FTPProxy": "127.0.0.1:4444",
-		"SOCKSVersion": 5,
-		"UseHTTPProxyForAllProtocols": false,
-		"UseProxyForDNS": true
-	},
-
-	"SearchBar": "unified",
-	"SearchEngines": {
-		"Default": "YaCy 'legwork'",
-		"Remove": ["Google"]
-	},
-	"SearchSuggestEnabled": false,
-
-	"SupportMenu": {
-		"Title": "Ilita IRC",
-		"URL": "http://irc.r4sas.i2p/?nick=WebClient...&channels=dev%2Cen%2Cru&prompt=1&uio=OT10cnVlde"
-	},
-	"VisualSearchEnabled": false,
-
-	"GenerativeAI": {
-		"Chatbot": false,
-		"LinkPreviews": false,
-		"TabGroups": false
-	},
-
-	"Preferences": {
-		"sidebar.main.tools": "bookmarks,history,syncedtabs",
-		"sidebar.notification.badge.aichat": false,
-		"browser.ml.chat.enabled": false,
-		"browser.ml.chat.page": false,
-		"browser.ml.chat.sidebar": false,
-		"browser.ml.chat.menu": false,
-		"browser.ml.chat.provider": "",
-		"browser.ml.linkPreview.enabled": false,
-		"browser.ml.linkPreview.optin": false,
-		"browser.ml.pageAssist.enabled": false,
-		"browser.ml.smartAssist.enabled": false,
-		"browser.search.visualSearch.featureGate": false,
-		"browser.urlbar.quicksuggest.enabled": false,
-		"browser.urlbar.suggest.quicksuggest.nonsponsored": false,
-		"browser.urlbar.suggest.quicksuggest.sponsored": false,
-		"network.IDN_show_punycode": true,
-		"browser.cache.disk.enable": false,
-		"datareporting.policy.dataSubmissionPolicyBypassNotification": true,
-		"browser.urlbar.suggest.bookmark": true,
-		"browser.urlbar.suggest.history": false,
-		"browser.urlbar.suggest.openpage": true,
-		"network.dns.disableIPv6": true,
-		"places.history.enabled": false,
-		"privacy.file_unique_origin": true,
-		"browser.tabs.firefox-view": false
-	}
+		"PromptForDownloadLocation": true,
+		"Proxy": {
+			"AutoLogin": true,
+			"FTPProxy": "127.0.0.1:4444",
+			"HTTPProxy": "127.0.0.1:4444",
+			"Mode": "manual",
+			"SOCKSVersion": 5,
+			"SSLProxy": "127.0.0.1:4444",
+			"UseHTTPProxyForAllProtocols": false,
+			"UseProxyForDNS": true
+		},
+		"SearchBar": "unified",
+		"SearchEngines": {
+			"Default": "YaCy 'legwork'",
+			"Remove": ["Google"]
+		},
+		"SearchSuggestEnabled": false,
+		"SupportMenu": {
+			"Title": "Ilita IRC",
+			"URL": "http://irc.r4sas.i2p/?nick=WebClient...&channels=dev%2Cen%2Cru&prompt=1&uio=OT10cnVlde"
+		}
 	}
 }
