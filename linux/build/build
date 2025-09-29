@@ -100,7 +100,7 @@ curl -L -f -# -o ../browser/browser/extensions/ru@dictionaries.addons.mozilla.or
 curl -L -f -# -o ../browser/browser/extensions/en-US@dictionaries.addons.mozilla.org.xpi \
   "https://addons.mozilla.org/firefox/downloads/latest/english-us-dictionary/latest.xpi"
 
-echo "Downloading NoScript (latest)..."
+echo "Downloading NoScript..."
 curl -L -f -# -o ../browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi \
   "https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
 
