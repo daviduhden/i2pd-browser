@@ -4,7 +4,7 @@ REM Copyright (c) 2013-2025, The PurpleI2P Project
 REM This file is part of Purple i2pd project and licensed under BSD3
 REM See full license text in LICENSE file at top of project tree
 
-setlocal enableextensions
+setlocal enableextensions enabledelayedexpansion
 
 set "CURL=%~dp0curl.exe"
 set "SEVENZIP=7z"
@@ -49,7 +49,7 @@ del /Q ..\Firefox\App\Firefox\browser\crashreporter-override.ini
 rmdir /S /Q ..\Firefox\App\Firefox\browser\features
 rmdir /S /Q ..\Firefox\App\Firefox\gmp-clearkey
 rmdir /S /Q ..\Firefox\App\Firefox\uninstall
-del /Q ..\Firefox\App\Firefox\Accessible*.*
+del /Q ..\Firefox\App\Firefox\Accessible*.*"
 del /Q ..\Firefox\App\Firefox\application.ini
 del /Q ..\Firefox\App\Firefox\crashreporter.*
 del /Q ..\Firefox\App\Firefox\*.sig
@@ -135,11 +135,33 @@ if "%locale%"=="ru" (
 ) else (
   echo Downloading I2Pd
 )
-for /f "delims=" %%A in ('powershell -NoProfile -Command ^
-  "$a=(Invoke-RestMethod https://api.github.com/repos/PurpleI2P/i2pd/releases/latest).assets; ^
-   ($a | Where-Object { $_.name -like 'i2pd_*_%xOS%_mingw.zip' } | Select-Object -ExpandProperty browser_download_url)"') do set "I2PD_URL=%%A"
+
+set "I2PD_URL="
+set "TMP_HTML=%TEMP%\i2pd_latest_%RANDOM%.html"
+"%CURL%" -L -f -s -o "%TMP_HTML%" "https://github.com/PurpleI2P/i2pd/releases/latest"
+if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit )
+
+for /f "usebackq delims=" %%L in ("%TMP_HTML%") do (
+  set "L=%%L"
+  echo !L!| findstr /i "/PurpleI2P/i2pd/releases/download/" >nul
+  if not errorlevel 1 (
+    echo !L!| findstr /i "_%xOS%_mingw.zip" >nul
+    if not errorlevel 1 (
+      echo !L!| findstr /i "i2pd_" >nul
+      if not errorlevel 1 (
+        set "R=!L:*href=\"=!"
+        for /f "tokens=1 delims=\"" %%U in ("!R!") do set "REL=%%U"
+        set "I2PD_URL=https://github.com!REL!"
+        goto :_I2PD_FOUND
+      )
+    )
+  )
+)
+:_I2PD_FOUND
+del /Q "%TMP_HTML%" >nul 2>&1
 
 if not defined I2PD_URL ( echo ERROR: couldn't resolve i2pd asset URL & pause & exit )
+
 "%CURL%" -L -f -# -O "%I2PD_URL%"
 if errorlevel 1 ( echo ERROR:%ErrorLevel% & pause & exit ) else (echo OK!)
 
