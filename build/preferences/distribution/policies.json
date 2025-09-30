@@ -60,7 +60,7 @@
 			"dom.disable_window_flip": true,
 			"dom.disable_window_move_resize": true,
 			"dom.event.contextmenu.enabled": false,
-			"network.IDN_show_punycode": false,
+			"network.IDN_show_punycode": true,
 			"network.dns.disableIPv6": true,
 			"places.history.enabled": true,
 			"privacy.file_unique_origin": true,
@@ -76,7 +76,17 @@
 			"sidebar.notification.badge.aichat": false,
 			"browser.newtabpage.activity-stream.showWeather": false,
 			"browser.newtabpage.activity-stream.system.showWeather": false,
-			"browser.urlbar.suggest.weather": false
+			"browser.urlbar.suggest.weather": false,
+			"browser.urlbar.speculativeConnect.enabled": false,
+			"browser.places.speculativeConnect.enabled": false,
+			"network.predictor.enabled": false,
+			"network.predictor.enable-prefetch": false,
+			"browser.urlbar.quicksuggest.enabled": false,
+			"browser.urlbar.suggest.quicksuggest.nonsponsored": false,
+			"browser.urlbar.suggest.quicksuggest.sponsored": false,
+			"browser.urlbar.trending.featureGate": false,
+			"signon.autofillForms": false,
+			"signon.formlessCapture.enabled": false
 		},
 
 		"PromptForDownloadLocation": true,
