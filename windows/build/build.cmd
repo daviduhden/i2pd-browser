@@ -38,7 +38,7 @@ if /i "%xOS%"=="win32" (
 
 REM Use Mozilla redirector to always get latest ESR
 set "FF_URL=https://download.mozilla.org/?product=%ESR_PRODUCT%&os=%dl_os%&lang=%locale%"
-"%CURL%" -L -f -# -o firefox.exe "%FF_URL" %$X%
+"%CURL%" -L -f -# -o firefox.exe "%FF_URL%" %PROXY_ARGS%
 if errorlevel 1 (
   echo ERROR:%ErrorLevel%
   echo éòàÅäÄ:%ErrorLevel%
@@ -262,9 +262,10 @@ goto :eof
 
 :GET_PROXY
 REM Pick up system proxy for curl if enabled
-set $X=&set $R=HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings
-for /F "Tokens=1,3" %%i in ('reg query "%$R%"^|find "Proxy"') do set %%i=%%j
-if "%ProxyEnable%"=="0x1" set "$X=-x %ProxyServer%"
+set "PROXY_ARGS="
+set "REG_PROXY=HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
+for /F "Tokens=1,3" %%i in ('reg query "%%REG_PROXY%%"^|find "Proxy"') do set %%i=%%j
+if "%ProxyEnable%"=="0x1" set "PROXY_ARGS=-x %ProxyServer%"
 goto :eof
 
 :GET_ARCH
