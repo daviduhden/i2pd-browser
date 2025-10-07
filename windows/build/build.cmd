@@ -8,6 +8,7 @@ setlocal enableextensions enabledelayedexpansion
 
 set "CURL=%~dp0curl.exe"
 set "SEVENZIP=7z"
+set "SED=%~dp0sed.exe"
 
 call :GET_ARGS %*
 call :GET_LOCALE
@@ -87,7 +88,7 @@ echo.
 echo Patching browser internal files to reduce external requests
 echo Патчинг внутренних файлов браузера для отключения внешних запросов
 "%SEVENZIP%" -bso0 -y x ..\Firefox\App\Firefox\omni.ja -o..\Firefox\App\tmp >nul 2>&1
-sed -i "s/https\:\/\/firefox\.settings\.services\.mozilla\.com\/v1/http\:\/\/127\.0\.0\.1/" ..\Firefox\App\tmp\modules\SearchUtils.sys.mjs
+"%SED%" -i "s/https\:\/\/firefox\.settings\.services\.mozilla\.com\/v1/http\:\/\/127\.0\.0\.1/" ..\Firefox\App\tmp\modules\SearchUtils.sys.mjs
 if errorlevel 1 (
   echo ERROR:%ErrorLevel%
   echo ОШИБКА:%ErrorLevel%
@@ -96,7 +97,7 @@ if errorlevel 1 (
   echo Patched 1/2
   echo Патч 1/2
 )
-sed -i "s/\"https\:\/\/firefox\.settings\.services\.mozilla\.com\/v1\",$/\"\",/" ..\Firefox\App\tmp\modules\AppConstants.sys.mjs
+"%SED%" -i "s/\"https\:\/\/firefox\.settings\.services\.mozilla\.com\/v1\",$/\"\",/" ..\Firefox\App\tmp\modules\AppConstants.sys.mjs
 if errorlevel 1 (
   echo ERROR:%ErrorLevel%
   echo ОШИБКА:%ErrorLevel%
@@ -176,9 +177,9 @@ if errorlevel 1 (
 echo.
 echo Disabling auto-updates via application.ini
 echo Отключение автообновлений через application.ini
-sed -i "s/Enabled=1/Enabled=0/g" "..\Firefox\App\Firefox\application.ini"
+"%SED%" -i "s/Enabled=1/Enabled=0/g" "..\Firefox\App\Firefox\application.ini"
 if errorlevel 1 ( echo WARN: couldn't set Enabled=0 & echo ВНИМАНИЕ: не удалось выставить Enabled=0 ) else ( echo OK! )
-sed -i "s/ServerURL=.*/ServerURL=-/" "..\Firefox\App\Firefox\application.ini"
+"%SED%" -i "s/ServerURL=.*/ServerURL=-/" "..\Firefox\App\Firefox\application.ini"
 if errorlevel 1 ( echo WARN: couldn't blank ServerURL & echo ВНИМАНИЕ: не удалось очистить ServerURL ) else ( echo OK! )
 
 echo.
