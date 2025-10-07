@@ -1,5 +1,5 @@
 @ECHO OFF
-REM Copyright (c) 2013-2019, The PurpleI2P Project
+REM Copyright (c) 2013-2025, The PurpleI2P Project
 REM This file is part of Purple i2pd project and licensed under BSD3
 REM See full license text in LICENSE file at top of project tree
 
