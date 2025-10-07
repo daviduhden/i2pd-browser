@@ -6,7 +6,7 @@ REM Этот файл — часть проекта Purple i2pd и распространяется по BSD3
 REM See full license text in LICENSE file at top of project tree
 REM Полный текст лицензии см. в файле LICENSE в корне проекта
 
-setlocal enableextensions enabledelayedexpansion
+setlocal EnableExtensions EnableDelayedExpansion
 
 REM ------------------------------------------------
 REM Detect locale (user UI language) -> ru or en-US
@@ -86,8 +86,8 @@ REM Использовать редиректор Mozilla для получения последней ESR
 set "FF_URL=https://download.mozilla.org/?product=%ESR_PRODUCT%&os=%dl_os%&lang=%locale%"
 "%CURL%" -L -f -# -o firefox.exe "%FF_URL%" %PROXY_ARGS%
 if errorlevel 1 (
-  echo ERROR: Firefox download failed (%ErrorLevel%).
-  if "%SHOW_RU%"=="1" echo ОШИБКА: Не удалось загрузить Firefox (%ErrorLevel%).
+  echo ERROR: Firefox download failed !ERRORLEVEL!
+  if "%SHOW_RU%"=="1" echo ОШИБКА: Не удалось загрузить Firefox !ERRORLEVEL!
   pause & exit /b 1
 ) else (
   echo OK!
@@ -100,51 +100,39 @@ if "%SHOW_RU%"=="1" echo Распаковка установщика и удаление ненужных файлов
 set "_7Z_RC=%ERRORLEVEL%"
 del /Q firefox.exe >nul 2>&1
 if not "%_7Z_RC%"=="0" (
-  echo ERROR: 7-Zip failed to extract Firefox (rc=%_7Z_RC%).
-  if "%SHOW_RU%"=="1" echo ОШИБКА: 7-Zip не смог распаковать Firefox (код=%_7Z_RC%).
+  echo ERROR: 7-Zip failed to extract Firefox. rc=%_7Z_RC%
+  if "%SHOW_RU%"=="1" echo ОШИБКА: 7-Zip не смог распаковать Firefox. код=%_7Z_RC%
   pause & exit /b 1
-)
-
-REM Some ESR builds unpack to \core, some directly to \Firefox. Normalize to \Firefox.
-REM В некоторых ESR – папка \core, в других сразу \Firefox. Привести к \Firefox.
-if exist "..\Firefox\App\core\NUL" (
-  ren "..\Firefox\App\core" "Firefox" >nul 2>&1
-) else (
-  if not exist "..\Firefox\App\Firefox\NUL" (
-    echo ERROR: Neither "core" nor "Firefox" folder exists after extraction.
-    if "%SHOW_RU%"=="1" echo ОШИБКА: После распаковки нет папки "core" или "Firefox".
-    pause & exit /b 1
-  )
 )
 
 REM Remove unneeded files safely
 REM Удалить лишние файлы безопасно
 if exist "..\Firefox\App\setup.exe" del /Q "..\Firefox\App\setup.exe" >nul 2>&1
-if exist "..\Firefox\App\Firefox\browser\crashreporter-override.ini" del /Q "..\Firefox\App\Firefox\browser\crashreporter-override.ini" >nul 2>&1
-if exist "..\Firefox\App\Firefox\browser\features\NUL" rmdir /S /Q "..\Firefox\App\Firefox\browser\features" >nul 2>&1
-if exist "..\Firefox\App\Firefox\gmp-clearkey\NUL" rmdir /S /Q "..\Firefox\App\Firefox\gmp-clearkey" >nul 2>&1
-if exist "..\Firefox\App\Firefox\uninstall\NUL" rmdir /S /Q "..\Firefox\App\Firefox\uninstall" >nul 2>&1
-if exist "..\Firefox\App\Firefox\Accessible*.*" del /Q "..\Firefox\App\Firefox\Accessible*.*" >nul 2>&1
-if exist "..\Firefox\App\Firefox\crashreporter.*" del /Q "..\Firefox\App\Firefox\crashreporter.*" >nul 2>&1
-if exist "..\Firefox\App\Firefox\*.sig" del /Q "..\Firefox\App\Firefox\*.sig" >nul 2>&1
-if exist "..\Firefox\App\Firefox\maintenanceservice*.*" del /Q "..\Firefox\App\Firefox\maintenanceservice*.*" >nul 2>&1
-if exist "..\Firefox\App\Firefox\minidump-analyzer.exe" del /Q "..\Firefox\App\Firefox\minidump-analyzer.exe" >nul 2>&1
-if exist "..\Firefox\App\Firefox\precomplete" del /Q "..\Firefox\App\Firefox\precomplete" >nul 2>&1
-if exist "..\Firefox\App\Firefox\removed-files" del /Q "..\Firefox\App\Firefox\removed-files" >nul 2>&1
-if exist "..\Firefox\App\Firefox\ucrtbase.dll" del /Q "..\Firefox\App\Firefox\ucrtbase.dll" >nul 2>&1
-if exist "..\Firefox\App\Firefox\update*.*" del /Q "..\Firefox\App\Firefox\update*.*" >nul 2>&1
-if not exist "..\Firefox\App\Firefox\browser\extensions\NUL" mkdir "..\Firefox\App\Firefox\browser\extensions" >nul 2>&1
+if exist "..\Firefox\App\core\browser\crashreporter-override.ini" del /Q "..\Firefox\App\core\browser\crashreporter-override.ini" >nul 2>&1
+if exist "..\Firefox\App\core\browser\features\NUL" rmdir /S /Q "..\Firefox\App\core\browser\features" >nul 2>&1
+if exist "..\Firefox\App\core\gmp-clearkey\NUL" rmdir /S /Q "..\Firefox\App\core\gmp-clearkey" >nul 2>&1
+if exist "..\Firefox\App\core\uninstall\NUL" rmdir /S /Q "..\Firefox\App\core\uninstall" >nul 2>&1
+if exist "..\Firefox\App\core\Accessible*.*" del /Q "..\Firefox\App\core\Accessible*.*" >nul 2>&1
+if exist "..\Firefox\App\core\crashreporter.*" del /Q "..\Firefox\App\core\crashreporter.*" >nul 2>&1
+if exist "..\Firefox\App\core\*.sig" del /Q "..\Firefox\App\core\*.sig" >nul 2>&1
+if exist "..\Firefox\App\core\maintenanceservice*.*" del /Q "..\Firefox\App\core\maintenanceservice*.*" >nul 2>&1
+if exist "..\Firefox\App\core\minidump-analyzer.exe" del /Q "..\Firefox\App\core\minidump-analyzer.exe" >nul 2>&1
+if exist "..\Firefox\App\core\precomplete" del /Q "..\Firefox\App\core\precomplete" >nul 2>&1
+if exist "..\Firefox\App\core\removed-files" del /Q "..\Firefox\App\core\removed-files" >nul 2>&1
+if exist "..\Firefox\App\core\ucrtbase.dll" del /Q "..\Firefox\App\core\ucrtbase.dll" >nul 2>&1
+if exist "..\Firefox\App\core\update*.*" del /Q "..\Firefox\App\core\update*.*" >nul 2>&1
+if not exist "..\Firefox\App\core\browser\extensions\NUL" mkdir "..\Firefox\App\core\browser\extensions" >nul 2>&1
 echo OK!
 
 REM Read exact version from application.ini
 REM Прочитать точную версию из application.ini
 set "FF_VER="
-if not exist "..\Firefox\App\Firefox\application.ini" (
+if not exist "..\Firefox\App\core\application.ini" (
   echo ERROR: application.ini not found.
   if "%SHOW_RU%"=="1" echo ОШИБКА: application.ini не найден.
   pause & exit /b 1
 )
-for /f "usebackq tokens=2 delims==" %%v in (`findstr /b /i "Version=" "..\Firefox\App\Firefox\application.ini"`) do set "FF_VER=%%v"
+for /f "usebackq tokens=2 delims==" %%v in (`findstr /b /i "Version=" "..\Firefox\App\core\application.ini"`) do set "FF_VER=%%v"
 if not defined FF_VER (
   echo ERROR: Couldn't read Firefox version from application.ini
   if "%SHOW_RU%"=="1" echo ОШИБКА: Не удалось прочитать версию Firefox из application.ini
@@ -158,8 +146,8 @@ if "%SHOW_RU%"=="1" echo Патчинг внутренних файлов браузера для отключения внешн
 
 set "_TMPDIR=..\Firefox\App\tmp"
 if exist "!_TMPDIR!\NUL" rmdir /S /Q "!_TMPDIR!" >nul 2>&1
-if exist "..\Firefox\App\Firefox\omni.ja" (
-  "%SEVENZIP%" -bso0 -y x "..\Firefox\App\Firefox\omni.ja" -o"!_TMPDIR!" >nul 2>&1
+if exist "..\Firefox\App\core\omni.ja" (
+  "%SEVENZIP%" -bso0 -y x "..\Firefox\App\core\omni.ja" -o"!_TMPDIR!" >nul 2>&1
   if errorlevel 1 (
     echo WARN: couldn't extract omni.ja
     if "%SHOW_RU%"=="1" echo ВНИМАНИЕ: не удалось распаковать omni.ja
@@ -199,15 +187,15 @@ if exist "..\Firefox\App\Firefox\omni.ja" (
     )
 
     if exist "!_TMPDIR!\NUL" (
-      if exist "..\Firefox\App\Firefox\omni.ja" ren "..\Firefox\App\Firefox\omni.ja" "omni.ja.bak" >nul 2>&1
-      "%SEVENZIP%" a -mx0 -tzip "..\Firefox\App\Firefox\omni.ja" -r "!_TMPDIR!\*" >nul 2>&1
+      if exist "..\Firefox\App\core\omni.ja" ren "..\Firefox\App\core\omni.ja" "omni.ja.bak" >nul 2>&1
+      "%SEVENZIP%" a -mx0 -tzip "..\Firefox\App\core\omni.ja" -r "!_TMPDIR!\*" >nul 2>&1
       rmdir /S /Q "!_TMPDIR!" >nul 2>&1
-      del /Q "..\Firefox\App\Firefox\omni.ja.bak" >nul 2>&1
+      del /Q "..\Firefox\App\core\omni.ja.bak" >nul 2>&1
     )
   )
 ) else (
-  echo WARN: omni.ja not found (skipping patches)
-  if "%SHOW_RU%"=="1" echo ВНИМАНИЕ: omni.ja не найден (патчи пропущены)
+  echo WARN: omni.ja not found - skipping patches
+  if "%SHOW_RU%"=="1" echo ВНИМАНИЕ: omni.ja не найден - патчи пропущены
 )
 echo OK!
 
@@ -218,38 +206,38 @@ if "%SHOW_RU%"=="1" echo Загрузка языковых пакетов
 REM Download RU langpack only if system locale is RU
 REM Скачивать RU-пакет только если язык системы RU
 if /i "%locale%"=="ru" (
-  "%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\langpack-ru@firefox.mozilla.org.xpi" ^
+  "%CURL%" -L -f -# -o "..\Firefox\App\core\browser\extensions\langpack-ru@firefox.mozilla.org.xpi" ^
     "%XPI_BASE%/ru.xpi" %PROXY_ARGS%
-  if errorlevel 1 (echo ERROR:%ErrorLevel% & if "%SHOW_RU%"=="1" echo ОШИБКА:%ErrorLevel% & pause & exit /b 1) else echo OK!
-  "%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\langpack-en-US@firefox.mozilla.org.xpi" ^
+  if errorlevel 1 (echo ERROR:!ErrorLevel! & if "%SHOW_RU%"=="1" echo ОШИБКА:!ErrorLevel! & pause & exit /b 1) else echo OK!
+  "%CURL%" -L -f -# -o "..\Firefox\App\core\browser\extensions\langpack-en-US@firefox.mozilla.org.xpi" ^
     "%XPI_BASE%/en-US.xpi" %PROXY_ARGS%
-  if errorlevel 1 (echo ERROR:%ErrorLevel% & if "%SHOW_RU%"=="1" echo ОШИБКА:%ErrorLevel% & pause & exit /b 1) else echo OK!
+  if errorlevel 1 (echo ERROR:!ErrorLevel! & if "%SHOW_RU%"=="1" echo ОШИБКА:!ErrorLevel! & pause & exit /b 1) else echo OK!
 )
 
 REM Dictionaries (RU only if locale=ru; en-US generally useful)
 REM Словари (RU только при locale=ru; en-US полезен всегда)
 if /i "%locale%"=="ru" (
-  "%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\ru@dictionaries.addons.mozilla.org.xpi" ^
+  "%CURL%" -L -f -# -o "..\Firefox\App\core\browser\extensions\ru@dictionaries.addons.mozilla.org.xpi" ^
     https://addons.mozilla.org/firefox/downloads/latest/russian-spellchecking-dic-3703/latest.xpi %PROXY_ARGS%
-  if errorlevel 1 (echo ERROR:%ErrorLevel% & if "%SHOW_RU%"=="1" echo ОШИБКА:%ErrorLevel% & pause & exit /b 1) else echo OK!
+  if errorlevel 1 (echo ERROR:!ErrorLevel! & if "%SHOW_RU%"=="1" echo ОШИБКА:!ErrorLevel! & pause & exit /b 1) else echo OK!
 )
-"%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\en-US@dictionaries.addons.mozilla.org.xpi" ^
+"%CURL%" -L -f -# -o "..\Firefox\App\core\browser\extensions\en-US@dictionaries.addons.mozilla.org.xpi" ^
   https://addons.mozilla.org/firefox/downloads/latest/english-us-dictionary/latest.xpi %PROXY_ARGS%
-if errorlevel 1 (echo ERROR:%ErrorLevel% & if "%SHOW_RU%"=="1" echo ОШИБКА:%ErrorLevel% & pause & exit /b 1) else echo OK!
+if errorlevel 1 (echo ERROR:!ErrorLevel! & if "%SHOW_RU%"=="1" echo ОШИБКА:!ErrorLevel! & pause & exit /b 1) else echo OK!
 
 echo.
 echo Downloading NoScript extension
 if "%SHOW_RU%"=="1" echo Загрузка дополнения NoScript
-"%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi" ^
+"%CURL%" -L -f -# -o "..\Firefox\App\core\browser\extensions\{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi" ^
   https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi %PROXY_ARGS%
-if errorlevel 1 (echo ERROR:%ErrorLevel% & if "%SHOW_RU%"=="1" echo ОШИБКА:%ErrorLevel% & pause & exit /b 1) else echo OK!
+if errorlevel 1 (echo ERROR:!ErrorLevel! & if "%SHOW_RU%"=="1" echo ОШИБКА:!ErrorLevel! & pause & exit /b 1) else echo OK!
 
-echo.
+echo(
 echo Disabling auto-updates via application.ini
 if "%SHOW_RU%"=="1" echo Отключение автообновлений через application.ini
-"%SED%" -i "s/Enabled=1/Enabled=0/g" "..\Firefox\App\Firefox\application.ini" >nul 2>&1
+"%SED%" -i "s/Enabled=1/Enabled=0/g" "..\Firefox\App\core\application.ini" >nul 2>&1
 if errorlevel 1 ( echo WARN: couldn't set Enabled=0 & if "%SHOW_RU%"=="1" echo ВНИМАНИЕ: не удалось выставить Enabled=0 ) else ( echo OK! & if "%SHOW_RU%"=="1" echo ОК! )
-"%SED%" -i "s/ServerURL=.*/ServerURL=-/" "..\Firefox\App\Firefox\application.ini" >nul 2>&1
+"%SED%" -i "s/ServerURL=.*/ServerURL=-/" "..\Firefox\App\core\application.ini" >nul 2>&1
 if errorlevel 1 ( echo WARN: couldn't blank ServerURL & if "%SHOW_RU%"=="1" echo ВНИМАНИЕ: не удалось очистить ServerURL ) else ( echo OK! & if "%SHOW_RU%"=="1" echo ОК! )
 
 echo.
@@ -262,64 +250,55 @@ if /i "%locale%"=="ru" (
 ) else (
   if exist "profile-en\*" copy /Y "profile-en\*" "..\Firefox\App\DefaultData\profile\" >nul 2>&1
 )
-copy /Y "firefox-portable\*" "..\Firefox\" >nul 2>&1
-xcopy /E /Y "preferences\*" "..\Firefox\App\Firefox\" >nul 2>&1
+if exist "firefox-portable\*" copy /Y "firefox-portable\*" "..\Firefox\" >nul 2>&1
+if exist "preferences\*" xcopy /E /Y "preferences\*" "..\Firefox\App\core\" >nul 2>&1
 echo OK!
 
 echo.
-echo Downloading I2Pd
-if "%SHOW_RU%"=="1" echo Загрузка I2Pd
+echo Locating and downloading I2Pd
+if "%SHOW_RU%"=="1" echo Поиск и загрузка I2Pd
 set "I2PD_URL="
-set "TMP_HTML=%TEMP%\i2pd_latest_%RANDOM%.html"
+set "TMP_JSON=%TEMP%\i2pd_latest_%RANDOM%.json"
+set "TMP_PS=%TEMP%\i2pd_pick_%RANDOM%.ps1"
 
-REM --- HTML scraping of the latest release page
-REM --- Парсинг HTML страницы последнего релиза
-"%CURL%" -L -f -s -o "%TMP_HTML%" "https://github.com/PurpleI2P/i2pd/releases/latest" %PROXY_ARGS%
+REM Query GitHub API for latest release JSON
+REM Запрашиваем JSON последнего релиза у GitHub API
+"%CURL%" -L -f -s -o "%TMP_JSON%" "https://api.github.com/repos/PurpleI2P/i2pd/releases/latest" %PROXY_ARGS%
 if errorlevel 1 (
-  echo ERROR:%ErrorLevel%
-  if "%SHOW_RU%"=="1" echo ОШИБКА:%ErrorLevel%
-  del /Q "%TMP_HTML%" >nul 2>&1
+  echo ERROR:!ErrorLevel!
+  if "%SHOW_RU%"=="1" echo ОШИБКА:!ErrorLevel!
+  del /Q "%TMP_JSON%" >nul 2>&1
   pause & exit /b 1
 )
 
-for /f "usebackq delims=" %%L in ("%TMP_HTML%") do (
-  set "L=%%L"
-  echo !L!| findstr /i "/PurpleI2P/i2pd/releases/download/" >nul
-  if not errorlevel 1 (
-    echo !L!| findstr /i "_%xOS%_mingw.zip" >nul
-    if not errorlevel 1 (
-      echo !L!| findstr /i "i2pd_" >nul
-      if not errorlevel 1 (
-        REM Carefully strip up to href=" and capture the URL before next quote
-        REM Аккуратно срезать до href=" и взять URL до следующей кавычки
-        set "R=!L:*href^"=!"
-        for /f tokens^=1^ delims^=^" %%U in ("!R!") do set "REL=%%U"
-        set "I2PD_URL=https://github.com!REL!"
-        goto :_I2PD_FOUND
-      )
-    )
-  )
-)
-:_I2PD_FOUND
-del /Q "%TMP_HTML%" >nul 2>&1
+REM Write a tiny PowerShell to pick the right asset robustly
+REM Пишем небольшой PowerShell-скрипт для надежного выбора ассета
+> "%TMP_PS%"  echo $ProgressPreference='SilentlyContinue'
+>>"%TMP_PS%"  echo $j = Get-Content -Raw '%TMP_JSON%' ^| ConvertFrom-Json
+>>"%TMP_PS%"  echo $asset = $j.assets ^| Where-Object { $_.name -match '_%xOS%_mingw\.zip$' } ^| Select-Object -First 1
+>>"%TMP_PS%"  echo if ($asset) { $asset.browser_download_url }
+
+for /f "usebackq delims=" %%U in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%TMP_PS%"`) do set "I2PD_URL=%%U"
+del /Q "%TMP_JSON%" >nul 2>&1
+del /Q "%TMP_PS%" >nul 2>&1
 
 if not defined I2PD_URL (
-  echo ERROR: couldn't resolve i2pd asset URL
-  if "%SHOW_RU%"=="1" echo ОШИБКА: не удалось найти ссылку на релиз i2pd
+  echo ERROR: couldn't resolve i2pd asset URL from GitHub API
+  if "%SHOW_RU%"=="1" echo ОШИБКА: не удалось получить ссылку i2pd из GitHub API
   pause & exit /b 1
 )
 
 "%CURL%" -L -f -# -OJ "%I2PD_URL%" %PROXY_ARGS%
 if errorlevel 1 (
-  echo ERROR:%ErrorLevel%
-  if "%SHOW_RU%"=="1" echo ОШИБКА:%ErrorLevel%
+  echo ERROR:!ErrorLevel!
+  if "%SHOW_RU%"=="1" echo ОШИБКА:!ErrorLevel!
   pause & exit /b 1
 ) else (
   echo OK!
 )
 
 REM Find the just-downloaded archive and extract i2pd.exe
-REM Найти скачанный архив и извлечь i2pd.exe
+REM Находим скачанный архив и извлекаем i2pd.exe
 set "I2PD_ZIP="
 for %%F in (i2pd*_%xOS%_mingw.zip) do set "I2PD_ZIP=%%~nxF"
 if not defined I2PD_ZIP (
@@ -331,8 +310,8 @@ if not defined I2PD_ZIP (
 set "_7Z_RC=%ERRORLEVEL%"
 del /Q "!I2PD_ZIP!" >nul 2>&1
 if not "%_7Z_RC%"=="0" (
-  echo ERROR: 7-Zip failed to extract i2pd.exe (rc=%_7Z_RC%).
-  if "%SHOW_RU%"=="1" echo ОШИБКА: 7-Zip не смог извлечь i2pd.exe (код=%_7Z_RC%).
+  echo ERROR: 7-Zip failed to extract i2pd.exe. rc=%_7Z_RC%
+  if "%SHOW_RU%"=="1" echo ОШИБКА: 7-Zip не смог извлечь i2pd.exe. код=%_7Z_RC%
   pause & exit /b 1
 )
 
@@ -412,12 +391,28 @@ for /f "delims=" %%F in ('dir /b /s "%LocalAppData%\Microsoft\WinGet\Packages\mb
 exit /b 1
 
 :GET_PROXY
-REM Use system proxy if enabled
-REM Использовать системный прокси, если включен
+REM Use system proxy if enabled (robust parsing; avoids "<local>" issues)
+REM Использовать системный прокси, если включен (устойчивый разбор; без проблем с "<local>")
 set "PROXY_ARGS="
+set "ProxyEnable="
+set "ProxyServer="
 set "REG_PROXY=HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
-for /F "Tokens=1,3" %%i in ('reg query "%REG_PROXY%"^|find "Proxy"') do set %%i=%%j
-if "%ProxyEnable%"=="0x1" set "PROXY_ARGS=-x %ProxyServer%"
+
+REM Read ProxyEnable (REG_DWORD -> 0x0 or 0x1)
+REM Читаем ProxyEnable (REG_DWORD -> 0x0 или 0x1)
+for /f "skip=2 tokens=3" %%A in ('
+  reg query "%REG_PROXY%" /v ProxyEnable 2^>nul
+') do set "ProxyEnable=%%A"
+
+REM Read ProxyServer (REG_SZ, may contain semicolons)
+REM Читаем ProxyServer (REG_SZ, может содержать точки с запятыми)
+for /f "skip=2 tokens=2,*" %%A in ('
+  reg query "%REG_PROXY%" /v ProxyServer 2^>nul
+') do set "ProxyServer=%%B"
+
+if /i "%ProxyEnable%"=="0x1" if defined ProxyServer (
+  set "PROXY_ARGS=-x %ProxyServer%"
+)
 exit /b 0
 
 :GET_ARCH
@@ -434,8 +429,9 @@ exit /b 0
 :GET_ARGS
 REM Option: --skipwait to avoid the final pause
 REM Опция: --skipwait, чтобы избежать финальной паузы
-set arg_skipwait=
+set "arg_skipwait="
+if "%~1"=="" exit /b 0
 for %%a in (%*) do (
-  if "%%a"=="--skipwait" set arg_skipwait=yes
+  if "%%a"=="--skipwait" set "arg_skipwait=yes"
 )
 exit /b 0
