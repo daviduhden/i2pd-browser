@@ -1,6 +1,5 @@
-@echo off
-
-REM Copyright (c) 2013-2025, The PurpleI2P Project
+@ECHO OFF
+REM Copyright (c) 2013-2019, The PurpleI2P Project
 REM This file is part of Purple i2pd project and licensed under BSD3
 REM See full license text in LICENSE file at top of project tree
 
@@ -38,6 +37,7 @@ if /i "%xOS%"=="win32" (
 )
 
 REM Use Mozilla redirector to always get latest ESR
+REM Используйте редиректор Mozilla для получения последней ESR
 set "FF_URL=https://download.mozilla.org/?product=%ESR_PRODUCT%&os=%dl_os%&lang=%locale%"
 "%CURL%" -L -f -# -o firefox.exe "%FF_URL%" %PROXY_ARGS%
 if errorlevel 1 (
@@ -61,6 +61,7 @@ rmdir /S /Q ..\Firefox\App\Firefox\gmp-clearkey
 rmdir /S /Q ..\Firefox\App\Firefox\uninstall
 del /Q "..\Firefox\App\Firefox\Accessible*.*"
 REM Do NOT delete application.ini; we need it to read the exact version and to disable updates
+REM Не удаляйте application.ini; он нужен для чтения версии и отключения обновлений
 REM del /Q ..\Firefox\App\Firefox\application.ini
 del /Q ..\Firefox\App\Firefox\crashreporter.*
 del /Q ..\Firefox\App\Firefox\*.sig
@@ -70,11 +71,11 @@ del /Q ..\Firefox\App\Firefox\precomplete
 del /Q ..\Firefox\App\Firefox\removed-files
 del /Q ..\Firefox\App\Firefox\ucrtbase.dll
 del /Q ..\Firefox\App\Firefox\update*.*
-
 mkdir ..\Firefox\App\Firefox\browser\extensions >nul
 echo OK!
 
 REM Read exact version from application.ini
+REM Прочитать точную версию из application.ini
 set "FF_VER="
 for /f "usebackq tokens=2 delims==" %%v in (`findstr /b /i "Version=" "..\Firefox\App\Firefox\application.ini"`) do set "FF_VER=%%v"
 if not defined FF_VER (
@@ -88,7 +89,7 @@ echo.
 echo Patching browser internal files to reduce external requests
 echo Патчинг внутренних файлов браузера для отключения внешних запросов
 "%SEVENZIP%" -bso0 -y x ..\Firefox\App\Firefox\omni.ja -o..\Firefox\App\tmp >nul 2>&1
-"%SED%" -i "s/https\:\/\/firefox\.settings\.services\.mozilla\.com\/v1/http\:\/\/127\.0\.0\.1/" ..\Firefox\App\tmp\modules\SearchUtils.sys.mjs
+"%SED%" -i "s/https\:\/\/firefox\.settings\.services\.mozilla\.com\/v1/http\:\/\/127\.0\.0\.1/" ..\Firefox\App\tmp\moz-src\toolkit\components\search\SearchUtils.sys.mjs
 if errorlevel 1 (
   echo ERROR:%ErrorLevel%
   echo ОШИБКА:%ErrorLevel%
@@ -118,6 +119,7 @@ echo Downloading language packs
 echo Загрузка языковых пакетов
 
 REM Always add RU to allow switching from EN
+REM Всегда добавляйте RU для возможности переключения с EN
 "%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\langpack-ru@firefox.mozilla.org.xpi ^
   "%XPI_BASE%/ru.xpi"
 if errorlevel 1 (
@@ -129,6 +131,7 @@ if errorlevel 1 (
 )
 
 REM Add en-US only if the base build is RU (en-US build doesn't need en-US langpack)
+REM Добавлять en-US только если базовая сборка RU (en-US не нужен для en-US)
 if /i "%locale%"=="ru" (
   "%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\langpack-en-US@firefox.mozilla.org.xpi ^
     "%XPI_BASE%/en-US.xpi"
@@ -142,6 +145,7 @@ if /i "%locale%"=="ru" (
 )
 
 REM Dictionaries
+REM Словари
 "%CURL%" -L -f -# -o ..\Firefox\App\Firefox\browser\extensions\ru@dictionaries.addons.mozilla.org.xpi ^
   https://addons.mozilla.org/firefox/downloads/latest/russian-spellchecking-dic-3703/latest.xpi
 if errorlevel 1 (
@@ -178,9 +182,9 @@ echo.
 echo Disabling auto-updates via application.ini
 echo Отключение автообновлений через application.ini
 "%SED%" -i "s/Enabled=1/Enabled=0/g" "..\Firefox\App\Firefox\application.ini"
-if errorlevel 1 ( echo WARN: couldn't set Enabled=0 & echo ВНИМАНИЕ: не удалось выставить Enabled=0 ) else ( echo OK! )
+if errorlevel 1 ( echo WARN: couldn't set Enabled=0 & echo ВНИМАНИЕ: не удалось выставить Enabled=0 ) else ( echo OK! & echo ОК! )
 "%SED%" -i "s/ServerURL=.*/ServerURL=-/" "..\Firefox\App\Firefox\application.ini"
-if errorlevel 1 ( echo WARN: couldn't blank ServerURL & echo ВНИМАНИЕ: не удалось очистить ServerURL ) else ( echo OK! )
+if errorlevel 1 ( echo WARN: couldn't blank ServerURL & echo ВНИМАНИЕ: не удалось очистить ServerURL ) else ( echo OK! & echo ОК! )
 
 echo.
 echo Copying Firefox launcher and settings
@@ -254,6 +258,7 @@ exit /b
 
 :GET_LOCALE
 REM Detect ru (Russian layout); otherwise default to en-US
+REM Определить ru (русская раскладка); иначе по умолчанию en-US
 for /f "tokens=3" %%a in ('reg query "HKEY_USERS\.DEFAULT\Keyboard Layout\Preload"^|find "REG_SZ"') do (
   if %%a==00000419 (set locale=ru) else (set locale=en-US)
   goto :eof
@@ -263,6 +268,7 @@ goto :eof
 
 :GET_PROXY
 REM Pick up system proxy for curl if enabled
+REM Использовать системный прокси для curl, если включен
 set "PROXY_ARGS="
 set "REG_PROXY=HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
 for /F "Tokens=1,3" %%i in ('reg query "%%REG_PROXY%%"^|find "Proxy"') do set %%i=%%j
@@ -271,12 +277,14 @@ goto :eof
 
 :GET_ARCH
 REM Determine 32/64-bit for downloading the correct installer
+REM Определить 32/64-бит для загрузки нужного установщика
 set xOS=win32
 if defined PROCESSOR_ARCHITEW6432 (set xOS=win64) else if /i "%PROCESSOR_ARCHITECTURE%" NEQ "x86" (set xOS=win64)
 goto :eof
 
 :GET_ARGS
 REM Optional: --skipwait to avoid final pause
+REM Необязательно: --skipwait чтобы избежать финальной паузы
 set arg_skipwait=
 for %%a in (%*) do (
   if "%%a"=="--skipwait" set arg_skipwait=yes
