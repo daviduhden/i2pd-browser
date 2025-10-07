@@ -1,7 +1,10 @@
 @ECHO OFF
 REM Copyright (c) 2013-2025, The PurpleI2P Project
+REM Авторские права (c) 2013-2025, The PurpleI2P Project
 REM This file is part of Purple i2pd project and licensed under BSD3
+REM Этот файл — часть проекта Purple i2pd и распространяется по BSD3
 REM See full license text in LICENSE file at top of project tree
+REM Полный текст лицензии см. в файле LICENSE в корне проекта
 
 title Starting I2Pd Browser / Запуск I2Pd Браузера
 set $pause=ping.exe 0.0.0.0 -n
