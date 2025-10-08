@@ -1,15 +1,15 @@
 @ECHO OFF
 REM Copyright (c) 2013-2025, The PurpleI2P Project
-REM Авторские права (c) 2013-2025, The PurpleI2P Project
+REM РђРІС‚РѕСЂСЃРєРёРµ РїСЂР°РІР° (c) 2013-2025, The PurpleI2P Project
 REM This file is part of Purple i2pd project and licensed under BSD3
-REM Этот файл — часть проекта Purple i2pd и распространяется по BSD3
+REM Р­С‚РѕС‚ С„Р°Р№Р» вЂ” С‡Р°СЃС‚СЊ РїСЂРѕРµРєС‚Р° Purple i2pd Рё СЂР°СЃРїСЂРѕСЃС‚СЂР°РЅСЏРµС‚СЃСЏ РїРѕ BSD3
 REM See full license text in LICENSE file at top of project tree
-REM Полный текст лицензии см. в файле LICENSE в корне проекта
+REM РџРѕР»РЅС‹Р№ С‚РµРєСЃС‚ Р»РёС†РµРЅР·РёРё СЃРј. РІ С„Р°Р№Р»Рµ LICENSE РІ РєРѕСЂРЅРµ РїСЂРѕРµРєС‚Р°
 
 setlocal EnableExtensions EnableDelayedExpansion
 
 REM Show Russian output ONLY if the system UI language is Russian
-REM Показывать русский вывод ТОЛЬКО если язык интерфейса системы — русский
+REM РџРѕРєР°Р·С‹РІР°С‚СЊ СЂСѓСЃСЃРєРёР№ РІС‹РІРѕРґ РўРћР›Р¬РљРћ РµСЃР»Рё СЏР·С‹Рє РёРЅС‚РµСЂС„РµР№СЃР° СЃРёСЃС‚РµРјС‹ вЂ” СЂСѓСЃСЃРєРёР№
 set "SHOW_RU=0"
 for /f "tokens=2,*" %%A in ('reg query "HKCU\Control Panel\International" /v LocaleName ^| find "LocaleName"') do set "LOCALE_NAME=%%B"
 if defined LOCALE_NAME (
@@ -19,7 +19,7 @@ if defined LOCALE_NAME (
 if "%SHOW_RU%"=="1" chcp 65001 >nul
 
 title Starting I2Pd Browser
-if "%SHOW_RU%"=="1" title Starting I2Pd Browser / Запуск I2Pd Браузера
+if "%SHOW_RU%"=="1" title Starting I2Pd Browser / Р—Р°РїСѓСЃРє I2Pd Р‘СЂР°СѓР·РµСЂР°
 
 set "$pause=ping.exe 0.0.0.0 -n"
 set "$cd=%CD%"
@@ -29,20 +29,20 @@ set "fire=firefox.exe"
 set "port=FirefoxPortable.exe"
 set "i2pd=i2pd.exe"
 
-REM Check if Firefox exists / Проверка наличия Firefox
+REM Check if Firefox exists / РџСЂРѕРІРµСЂРєР° РЅР°Р»РёС‡РёСЏ Firefox
 if not exist Firefox (
     echo Firefox not found... Starting build...
-    if "%SHOW_RU%"=="1" echo Firefox не найден... Начинаю сборку...
+    if "%SHOW_RU%"=="1" echo Firefox РЅРµ РЅР°Р№РґРµРЅ... РќР°С‡РёРЅР°СЋ СЃР±РѕСЂРєСѓ...
     pushd build
     call build.cmd --skipwait
     popd
 )
 
-REM Kill FirefoxPortable if running / Завершение FirefoxPortable, если запущен
+REM Kill FirefoxPortable if running / Р—Р°РІРµСЂС€РµРЅРёРµ FirefoxPortable, РµСЃР»Рё Р·Р°РїСѓС‰РµРЅ
 tasklist | find /i "%port%" >nul && (taskkill /im "%port%" /t >nul) && (%$pause% 2 >nul)
 REM tasklist | find /i "%fire%" >nul && (taskkill /im "%fire%" >nul)
 
-REM Check if i2pd is running / Проверка, запущен ли i2pd
+REM Check if i2pd is running / РџСЂРѕРІРµСЂРєР°, Р·Р°РїСѓС‰РµРЅ Р»Рё i2pd
 tasklist | find /i "%i2pd%" >nul && (goto runfox) || (goto starti2p)
 
 :starti2p
@@ -50,15 +50,15 @@ cd i2pd
 start "" "%i2pd%"
 
 echo i2pd Browser starting...
-if "%SHOW_RU%"=="1" echo Запуск i2pd Браузера...
+if "%SHOW_RU%"=="1" echo Р—Р°РїСѓСЃРє i2pd Р‘СЂР°СѓР·РµСЂР°...
 echo Please wait
-if "%SHOW_RU%"=="1" echo Пожалуйста, подождите
+if "%SHOW_RU%"=="1" echo РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РїРѕРґРѕР¶РґРёС‚Рµ
 echo -------------------------------------
 for /L %%B in (0,1,35) do (call :EchoWithoutCrLf "." && %$pause% 2 >nul)
 echo .
 echo -------------------------------------
 echo Welcome to I2P Network
-if "%SHOW_RU%"=="1" echo Добро пожаловать в сеть I2P
+if "%SHOW_RU%"=="1" echo Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ РІ СЃРµС‚СЊ I2P
 cd "%$cd%"
 
 :runfox
@@ -68,8 +68,8 @@ cd "%$cd%"
 exit /b 0
 
 rem ==========================================================================
-rem EchoWithoutCrLf procedure / Процедура EchoWithoutCrLf
-rem %1 : text to output / текст для вывода
+rem EchoWithoutCrLf procedure / РџСЂРѕС†РµРґСѓСЂР° EchoWithoutCrLf
+rem %1 : text to output / С‚РµРєСЃС‚ РґР»СЏ РІС‹РІРѕРґР°
 rem ==========================================================================
 :EchoWithoutCrLf
     <nul set /p strTemp=%~1
