@@ -1,5 +1,5 @@
 # Copyright (c) 2025, The PurpleI2P Project
-# Авторские права (c) 2013-2025, The PurpleI2P Project
+# Авторские права (c) 2025, The PurpleI2P Project
 # This file is part of Purple i2pd project and licensed under BSD3
 # Этот файл — часть проекта Purple i2pd и распространяется по BSD3
 # See full license text in LICENSE file at top of project tree
