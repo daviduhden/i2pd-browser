@@ -62,6 +62,43 @@ echo Building I2Pd Browser Portable
 if "%SHOW_RU%"=="1" echo Сборка I2Pd Browser Portable
 echo Browser locale: %locale%, architecture: %xOS%
 if "%SHOW_RU%"=="1" echo Язык браузера: %locale%, архитектура: %xOS%
+if "%xOS%"=="unsupported" (
+  echo ERROR: Unsupported architecture (ARM not supported)
+  if "%SHOW_RU%"=="1" echo ОШИБКА: Неподдерживаемая архитектура (ARM не поддерживается)
+  pause & exit /b 1
+)
+
+echo.
+echo Updating Windows root certificates from CA bundle
+if "%SHOW_RU%"=="1" echo Обновление корневых сертификатов Windows из пакета CA
+set "CA_BUNDLE_URL=https://raw.githubusercontent.com/bagder/ca-bundle/master/ca-bundle.crt"
+where certutil >nul 2>&1
+if errorlevel 1 (
+  echo WARNING: certutil.exe not found; skipping root certificate update.
+  if "%SHOW_RU%"=="1" echo Предупреждение: certutil.exe не найден; пропускаем обновление корневых сертификатов.
+) else (
+  set "TMP_CA=%TEMP%\ca_bundle_%RANDOM%.crt"
+  "%CURL%" -L -f -s -o "%TMP_CA%" "%CA_BUNDLE_URL%" %PROXY_ARGS%
+  if errorlevel 1 (
+    echo WARNING: Failed to download CA bundle; skipping root certificate update.
+    if "%SHOW_RU%"=="1" echo Предупреждение: не удалось скачать пакет CA; пропускаем обновление корневых сертификатов.
+    del /Q "%TMP_CA%" >nul 2>&1
+  ) else (
+    certutil -f -user -addstore Root "%TMP_CA%" >nul
+    set "_CERTUTIL_RC=%ERRORLEVEL%"
+    del /Q "%TMP_CA%" >nul 2>&1
+    if not "%_CERTUTIL_RC%"=="0" (
+      echo WARNING: certutil couldn't import CA bundle (rc=%_CERTUTIL_RC%). Continuing.
+      if "%SHOW_RU%"=="1" echo Предупреждение: certutil не смог импортировать пакет CA (код=%_CERTUTIL_RC%). Продолжаем.
+    ) else (
+      echo Root certificates updated.
+      if "%SHOW_RU%"=="1" echo Корневые сертификаты обновлены.
+    )
+    set "_CERTUTIL_RC="
+  )
+  set "TMP_CA="
+)
+
 
 echo.
 echo Downloading Firefox ESR installer
@@ -136,7 +173,6 @@ if not defined FF_VER (
   if "%SHOW_RU%"=="1" echo ОШИБКА: Не удалось прочитать версию Firefox из application.ini
   pause & exit /b 1
 )
-set "XPI_BASE=https://releases.mozilla.org/pub/firefox/releases/%FF_VER%/%dl_os%/xpi"
 
 echo.
 echo Patching browser internal files to reduce external requests
@@ -203,6 +239,7 @@ if "%SHOW_RU%"=="1" echo Загрузка языковых пакетов
 
 REM Download RU langpack only if system locale is RU
 REM Скачивать RU-пакет только если язык системы RU
+set "XPI_BASE=https://releases.mozilla.org/pub/firefox/releases/%FF_VER%/%dl_os%/xpi"
 if /i "%locale%"=="ru" (
   "%CURL%" -L -f -# -o "..\Firefox\App\core\browser\extensions\langpack-ru@firefox.mozilla.org.xpi" ^
     "%XPI_BASE%/ru.xpi" %PROXY_ARGS%
