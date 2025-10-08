@@ -8,10 +8,9 @@ REM Полный текст лицензии см. в файле LICENSE в корне проекта
 
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM ------------------------------------------------
 REM Detect locale (user UI language) -> ru or en-US
 REM Определить язык интерфейса пользователя -> ru или en-US
-REM ------------------------------------------------
+
 set "locale=en-US"
 for /f "tokens=2,*" %%A in ('reg query "HKCU\Control Panel\International" /v LocaleName ^| find "LocaleName"') do set "_loc=%%B"
 if defined _loc (
@@ -28,10 +27,9 @@ REM Switch to UTF-8 only when printing Russian (avoid mojibake)
 REM Включать UTF-8 только при печати русского (чтобы избежать кракозябр)
 if "%SHOW_RU%"=="1" chcp 65001 >nul
 
-REM ------------------------------------------------
 REM Ensure WinGet and required tools are installed/available
 REM Убедиться, что WinGet и необходимые инструменты установлены/доступны
-REM ------------------------------------------------
+
 call :ENSURE_WINGET || (echo ERROR: WinGet not available. Install "App Installer" from the Microsoft Store and retry.& if "%SHOW_RU%"=="1" echo ОШИБКА: WinGet недоступен. Установите "App Installer" из Microsoft Store и повторите.& pause & exit /b 1)
 
 echo Checking and installing prerequisites via WinGet...
@@ -259,7 +257,6 @@ echo Locating and downloading I2Pd
 if "%SHOW_RU%"=="1" echo Поиск и загрузка I2Pd
 set "I2PD_URL="
 set "TMP_JSON=%TEMP%\i2pd_latest_%RANDOM%.json"
-set "TMP_PS=%TEMP%\i2pd_pick_%RANDOM%.ps1"
 
 REM Query GitHub API for latest release JSON
 REM Запрашиваем JSON последнего релиза у GitHub API
@@ -271,16 +268,12 @@ if errorlevel 1 (
   pause & exit /b 1
 )
 
-REM Write a tiny PowerShell to pick the right asset robustly
-REM Пишем небольшой PowerShell-скрипт для надежного выбора ассета
-> "%TMP_PS%"  echo $ProgressPreference='SilentlyContinue'
->>"%TMP_PS%"  echo $j = Get-Content -Raw '%TMP_JSON%' ^| ConvertFrom-Json
->>"%TMP_PS%"  echo $asset = $j.assets ^| Where-Object { $_.name -match '_%xOS%_mingw\.zip$' } ^| Select-Object -First 1
->>"%TMP_PS%"  echo if ($asset) { $asset.browser_download_url }
-
-for /f "usebackq delims=" %%U in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%TMP_PS%"`) do set "I2PD_URL=%%U"
+REM Resolve asset URL via dedicated PowerShell helper
+REM Разрешить URL ассета с помощью вспомогательного PowerShell-скрипта
+for /f "usebackq delims=" %%U in (`
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Get-I2pdAssetUrl.ps1" -JsonPath "%TMP_JSON%" -OsTag "%xOS%"
+`) do set "I2PD_URL=%%U"
 del /Q "%TMP_JSON%" >nul 2>&1
-del /Q "%TMP_PS%" >nul 2>&1
 
 if not defined I2PD_URL (
   echo ERROR: couldn't resolve i2pd asset URL from GitHub API
