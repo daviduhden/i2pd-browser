@@ -1,24 +1,24 @@
 @ECHO OFF
 REM Copyright (c) 2013-2025, The PurpleI2P Project
-REM Авторские права (c) 2013-2025, The PurpleI2P Project
+REM РђРІС‚РѕСЂСЃРєРёРµ РїСЂР°РІР° (c) 2013-2025, The PurpleI2P Project
 REM This file is part of the Purple i2pd project and is licensed under BSD-3-Clause.
-REM Этот файл — часть проекта Purple i2pd и распространяется по лицензии BSD-3-Clause.
+REM Р­С‚РѕС‚ С„Р°Р№Р» вЂ” С‡Р°СЃС‚СЊ РїСЂРѕРµРєС‚Р° Purple i2pd Рё СЂР°СЃРїСЂРѕСЃС‚СЂР°РЅСЏРµС‚СЃСЏ РїРѕ Р»РёС†РµРЅР·РёРё BSD-3-Clause.
 REM See the full license text in the LICENSE file at the top of the project tree.
-REM Полный текст лицензии см. в файле LICENSE в корне проекта.
+REM РџРѕР»РЅС‹Р№ С‚РµРєСЃС‚ Р»РёС†РµРЅР·РёРё СЃРј. РІ С„Р°Р№Р»Рµ LICENSE РІ РєРѕСЂРЅРµ РїСЂРѕРµРєС‚Р°.
 
 echo Creating a 7z archive with the bundle...
-echo Создаем 7z архив с набором...
+echo РЎРѕР·РґР°РµРј 7z Р°СЂС…РёРІ СЃ РЅР°Р±РѕСЂРѕРј...
 REM The result is a .7z archive containing the folders Firefox, i2pd, and the files StartI2PdBrowser.bat and browser.ico from the src folder one level up.
-REM На выходе получаем 7z архив, в котором будут лежать папки Firefox, i2pd и файлы StartI2PdBrowser.bat и browser.ico из папки src уровнем выше.
+REM РќР° РІС‹С…РѕРґРµ РїРѕР»СѓС‡Р°РµРј 7z Р°СЂС…РёРІ, РІ РєРѕС‚РѕСЂРѕРј Р±СѓРґСѓС‚ Р»РµР¶Р°С‚СЊ РїР°РїРєРё Firefox, i2pd Рё С„Р°Р№Р»С‹ StartI2PdBrowser.bat Рё browser.ico РёР· РїР°РїРєРё src СѓСЂРѕРІРЅРµРј РІС‹С€Рµ.
 7z a -t7z -m0=lzma2:d192m -mx=9 -aoa -mfb=273 -md=128m -ms=on -- I2PdBrowserPortable.7z ..\..\windows\Firefox ..\..\windows\i2pd ..\src\StartI2PdBrowser.bat ..\src\browser.ico
 
 echo Creating 7z SFX (self-extracting archive)...
-echo Создаем 7z SFX - самораспаковывающийся архив...
+echo РЎРѕР·РґР°РµРј 7z SFX - СЃР°РјРѕСЂР°СЃРїР°РєРѕРІС‹РІР°СЋС‰РёР№СЃСЏ Р°СЂС…РёРІ...
 REM Produces a self-extracting archive; then the intermediate .7z is removed.
-REM На выходе получаем самораспаковывающийся архив, после чего промежуточный .7z удаляется.
+REM РќР° РІС‹С…РѕРґРµ РїРѕР»СѓС‡Р°РµРј СЃР°РјРѕСЂР°СЃРїР°РєРѕРІС‹РІР°СЋС‰РёР№СЃСЏ Р°СЂС…РёРІ, РїРѕСЃР»Рµ С‡РµРіРѕ РїСЂРѕРјРµР¶СѓС‚РѕС‡РЅС‹Р№ .7z СѓРґР°Р»СЏРµС‚СЃСЏ.
 copy /b 7zsd_LZMA2_i2pdbrowser_1.3.3.sfx + config.txt + I2PdBrowserPortable.7z I2PdBrowserPortable_1.3.3.exe >> NUL
 del I2PdBrowserPortable.7z >> NUL
 
 echo Done!
-echo Готово!
+echo Р“РѕС‚РѕРІРѕ!
 pause
