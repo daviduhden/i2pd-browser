@@ -16,6 +16,9 @@ if defined LOCALE_NAME (
   set "LC2=!LOCALE_NAME:~0,2!"
   if /i "!LC2!"=="ru" set "SHOW_RU=1"
 )
+
+REM Switch to UTF-8 only when printing Russian (avoid mojibake)
+REM Включать UTF-8 только при печати русского (чтобы избежать кракозябр)
 if "%SHOW_RU%"=="1" chcp 65001 >nul
 
 title Starting I2Pd Browser
