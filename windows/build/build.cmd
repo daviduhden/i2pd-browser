@@ -12,16 +12,15 @@ REM Detect locale (user UI language) -> ru or en-US
 REM Определить язык интерфейса пользователя -> ru или en-US
 
 set "locale=en-US"
-for /f "tokens=2,*" %%A in ('reg query "HKCU\Control Panel\International" /v LocaleName ^| find "LocaleName"') do set "_loc=%%B"
-if defined _loc (
-  set "_loc=!_loc:~0,2!"
-  if /i "!_loc!"=="ru" set "locale=ru"
-)
-
-REM Flag to show Russian (only when locale=ru)
-REM Флаг показа русского (только при locale=ru)
 set "SHOW_RU=0"
-if /i "%locale%"=="ru" set "SHOW_RU=1"
+for /f "tokens=2,*" %%A in ('reg query "HKCU\Control Panel\International" /v LocaleName ^| find "LocaleName"') do set "LOCALE_NAME=%%B"
+if defined LOCALE_NAME (
+  set "LC2=!LOCALE_NAME:~0,2!"
+  if /i "!LC2!"=="ru" (
+    set "SHOW_RU=1"
+    set "locale=ru"
+  )
+)
 
 REM Switch to UTF-8 only when printing Russian (avoid mojibake)
 REM Включать UTF-8 только при печати русского (чтобы избежать кракозябр)
