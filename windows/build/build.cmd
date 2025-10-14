@@ -109,11 +109,10 @@ if "%SHOW_RU%"=="1" echo Загрузка установщика Firefox ESR
 
 REM Only win32/win64 builds are available (ARM is unsupported)
 REM Доступны только сборки win32/win64 (ARM не поддерживается)
-if /i "%xOS%"=="win32" (
-  set "dl_os=win32"
-) else if /i "%xOS%"=="win64" (
-  set "dl_os=win64"
-) else (
+set "dl_os="
+if /i "%xOS%"=="win32" set "dl_os=win32"
+if /i "%xOS%"=="win64" set "dl_os=win64"
+if not defined dl_os (
   echo ERROR: Unsupported architecture "%xOS%". Only win32/win64 are supported.
   if "%SHOW_RU%"=="1" echo ОШИБКА: Неподдерживаемая архитектура "%xOS%". Поддерживаются только win32/win64.
   pause & exit /b 1
