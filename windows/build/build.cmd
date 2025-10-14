@@ -1,9 +1,12 @@
-@echo off
+@ECHO OFF
 REM Copyright (c) 2013-2025, The PurpleI2P Project
 REM This file is part of Purple i2pd project and licensed under BSD3
 REM See full license text in LICENSE file at top of project tree
 
 setlocal EnableExtensions EnableDelayedExpansion
+
+REM --- Unquote TEMP once and reuse everywhere ---
+set "TEMP_UNQ=%TEMP:"=%"
 
 REM --- Always run from this script folder (stable relative paths) ---
 pushd "%~dp0"
@@ -35,21 +38,21 @@ call :ENSURE_SED    >nul 2>&1
 REM --- Architecture gate (block native ARM/IA64) ---
 if "%ARCH_SUPPORTED%"=="0" (
   if /i "%locale%"=="ru" (
-    echo ОШИБКА: Неподдерживаемая архитектура (ARM/IA64 не поддерживается).
+    echo ОШИБКА: Неподдерживаемая архитектура ^(ARM/IA64 не поддерживается^).
   ) else (
-    echo ERROR: Unsupported architecture (ARM/IA64 not supported).
+    echo ERROR: Unsupported architecture ^(ARM/IA64 not supported^).
   )
   if /i "%arg_skipwait%"=="yes" (popd & exit /b 1) else (pause & popd & exit /b 1)
 )
 
 if /i "%locale%"=="ru" (
   echo Сборка I2Pd Browser Portable
-  echo Язык браузера: !locale!, архитектура: !ARCH_DISPLAY!
+  echo Язык браузера: %locale%, архитектура: %ARCH_DISPLAY%
   echo.
   echo Загрузка установщика Firefox ESR
 ) else (
   echo Building I2Pd Browser Portable
-  echo Browser locale: !locale!, architecture: !ARCH_DISPLAY!
+  echo Browser locale: %locale%, architecture: %ARCH_DISPLAY%
   echo.
   echo Downloading Firefox ESR installer
 )
@@ -59,68 +62,78 @@ set "FF_REDIRECT=https://download.mozilla.org/?product=firefox-esr-latest&os=%xO
 "%CURL%" -L -f -# -OJ "%FF_REDIRECT%" %PROXY_ARGS%
 if errorlevel 1 (
   echo ERROR:%ErrorLevel%
-  if not /i "%arg_skipwait%"=="yes" pause
+  if /I "%arg_skipwait%" NEQ "yes" pause
   popd & exit /b 1
 )
 
-REM Find downloaded installer filename (e.g., "Firefox Setup 115.xx.0esr.exe")
+REM Try to find the downloaded installer filename (typical: "Firefox Setup <ver>esr.exe")
 for /f "delims=" %%F in ('dir /b "Firefox*Setup*esr*.exe" 2^>nul') do (
   set "FF_EXE=%%F"
   goto :FF_FOUND
 )
 :FF_FOUND
 if not defined FF_EXE (
-  if /i "%locale%"=="ru" (echo ОШИБКА: установщик Firefox не найден после загрузки.) else (echo ERROR: Firefox installer not found after download.)
-  if not /i "%arg_skipwait%"=="yes" pause
-  popd & exit /b 1
+  REM Fallback: some servers save as "curl_response" when no Content-Disposition
+  if exist "curl_response" (
+    set "FF_EXE=curl_response"
+  ) else (
+    if /i "%locale%"=="ru" (echo ОШИБКА: установщик Firefox не найден после загрузки.) else (echo ERROR: Firefox installer not found after download.)
+    if /I "%arg_skipwait%" NEQ "yes" pause
+    popd & exit /b 1
+  )
 )
 
-REM Derive exact ESR version from filename
+REM Derive exact ESR version from filename when possible
 set "FFversion=%FF_EXE:Firefox Setup =%"
 set "FFversion=%FFversion:.exe=%"
+if /I "%FFversion%"=="%FF_EXE%" set "FFversion="
 
-if /i "%locale%"=="ru" (
-  echo Найдена версия Firefox ESR: %FFversion%
-  echo Проверка целостности установщика по SHA512SUMS
-) else (
-  echo Detected Firefox ESR version: %FFversion%
-  echo Verifying installer integrity via SHA512SUMS
-)
-
-REM --- 2) Verify SHA512 against ftp.mozilla.org SHA512SUMS ---
-set "TMP_SHA=%TEMP%\ff_sha_%RANDOM%.txt"
-"%CURL%" -L -f -s -o "%TMP_SHA%" "https://ftp.mozilla.org/pub/firefox/releases/%FFversion%/SHA512SUMS" %PROXY_ARGS%
-if errorlevel 1 (
-  if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: не удалось скачать SHA512SUMS; продолжаем без проверки.) else (echo WARNING: Failed to download SHA512SUMS; continuing without verification.)
-) else (
-  set "FF_REL=%xOS%/%locale%/Firefox Setup %FFversion%.exe"
-  set "FF_SHA_EXP="
-  for /f "tokens=1" %%H in ('findstr /C:"%FF_REL%" "%TMP_SHA%"') do set "FF_SHA_EXP=%%H"
-  if not defined FF_SHA_EXP (
-    if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: в SHA512SUMS нет строки для %FF_REL%.) else (echo WARNING: No matching line in SHA512SUMS for %FF_REL%.)
+if defined FFversion (
+  if /i "%locale%"=="ru" (
+    echo Найдена версия Firefox ESR: %FFversion%
+    echo Проверка целостности установщика по SHA512SUMS
   ) else (
-    REM Compute SHA512 and strip spaces/newlines from certutil output
-    set "FF_SHA="
-    for /f "usebackq delims=" %%L in (`certutil -hashfile "%FF_EXE%" SHA512 ^| findstr /R "^[0-9A-Fa-f]"`) do (
-      set "LINE=%%L"
-      set "LINE=!LINE: =!"
-      set "FF_SHA=!FF_SHA!!LINE!"
-    )
-    if not defined FF_SHA (
-      if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: не удалось вычислить SHA512 установщика.) else (echo WARNING: Failed to compute installer SHA512.)
+    echo Detected Firefox ESR version: %FFversion%
+    echo Verifying installer integrity via SHA512SUMS
+  )
+
+  REM --- 2) Verify SHA512 against ftp.mozilla.org SHA512SUMS ---
+  set "TMP_SHA=%TEMP_UNQ%\ff_sha_%RANDOM%.txt"
+  "%CURL%" -L -f -s -o "%TMP_SHA%" "https://ftp.mozilla.org/pub/firefox/releases/%FFversion%/SHA512SUMS" %PROXY_ARGS%
+  if errorlevel 1 (
+    if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: не удалось скачать SHA512SUMS; продолжаем без проверки.) else (echo WARNING: Failed to download SHA512SUMS; continuing without verification.)
+  ) else (
+    set "FF_REL=%xOS%/%locale%/Firefox Setup %FFversion%.exe"
+    set "FF_SHA_EXP="
+    for /f "tokens=1" %%H in ('findstr /C:"%FF_REL%" "%TMP_SHA%"') do set "FF_SHA_EXP=%%H"
+    if not defined FF_SHA_EXP (
+      if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: в SHA512SUMS нет строки для %FF_REL%.) else (echo WARNING: No matching line in SHA512SUMS for %FF_REL%.)
     ) else (
-      if /I not "!FF_SHA!"=="%FF_SHA_EXP%" (
-        if /i "%locale%"=="ru" (echo ОШИБКА: несовпадение SHA512. Ожидалось: %FF_SHA_EXP%, Получено: !FF_SHA!.) else (echo ERROR: SHA512 mismatch. Expected: %FF_SHA_EXP%  Got: !FF_SHA!.)
-        if not /i "%arg_skipwait%"=="yes" pause
-        del /Q "%TMP_SHA%" >nul 2>&1
-        popd & exit /b 1
+      REM Compute SHA512 and strip spaces/newlines from certutil output
+      set "FF_SHA="
+      for /f "usebackq delims=" %%L in (`certutil -hashfile "%FF_EXE%" SHA512 ^| findstr /R "^[0-9A-Fa-f]"`) do (
+        set "LINE=%%L"
+        set "LINE=!LINE: =!"
+        set "FF_SHA=!FF_SHA!!LINE!"
+      )
+      if not defined FF_SHA (
+        if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: не удалось вычислить SHA512 установщика.) else (echo WARNING: Failed to compute installer SHA512.)
       ) else (
-        if /i "%locale%"=="ru" (echo Проверка пройдена.) else (echo Integrity OK.)
+        if /I not "!FF_SHA!"=="%FF_SHA_EXP%" (
+          if /i "%locale%"=="ru" (echo ОШИБКА: несовпадение SHA512. Ожидалось: %FF_SHA_EXP%, Получено: !FF_SHA!.) else (echo ERROR: SHA512 mismatch. Expected: %FF_SHA_EXP%  Got: !FF_SHA!.)
+          if /I "%arg_skipwait%" NEQ "yes" pause
+          del /Q "%TMP_SHA%" >nul 2>&1
+          popd & exit /b 1
+        ) else (
+          if /i "%locale%"=="ru" (echo Проверка пройдена.) else (echo Integrity OK.)
+        )
       )
     )
   )
+  del /Q "%TMP_SHA%" >nul 2>&1
+) else (
+  if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: не удалось определить версию из имени файла; проверка SHA будет пропущена.) else (echo WARNING: Couldn’t determine version from filename; skipping SHA check.)
 )
-del /Q "%TMP_SHA%" >nul 2>&1
 
 echo.
 if /i "%locale%"=="ru" (
@@ -132,8 +145,8 @@ where certutil >nul 2>&1
 if errorlevel 1 (
   if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: certutil.exe не найден; пропускаем.) else (echo WARNING: certutil.exe not found; skipping.)
 ) else (
-  set "CA_BUNDLE_URL=https://raw.githubusercontent.com/bagder/ca-bundle/master/ca-bundle.crt"
-  set "TMP_CA=%TEMP%\ca_bundle_%RANDOM%.crt"
+  set "CA_BUNDLE_URL=https://curl.se/ca/cacert.pem"
+  set "TMP_CA=%TEMP_UNQ%\ca_bundle_%RANDOM%.crt"
   "%CURL%" -L -f -s -o "%TMP_CA%" "%CA_BUNDLE_URL%" %PROXY_ARGS%
   if errorlevel 1 (
     if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: не удалось скачать пакет CA; пропускаем.) else (echo WARNING: Failed to download CA bundle; skipping.)
@@ -143,7 +156,7 @@ if errorlevel 1 (
     set "_RC=%ERRORLEVEL%"
     del /Q "%TMP_CA%" >nul 2>&1
     if not "%_RC%"=="0" (
-      if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: certutil не смог импортировать пакет CA (код=%_RC%).) else (echo WARNING: certutil couldn't import CA bundle (rc=%_RC%).)
+      if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: certutil не смог импортировать пакет CA ^(код=%_RC%^).) else (echo WARNING: certutil couldn't import CA bundle ^(rc=%_RC%^).)
     ) else (
       if /i "%locale%"=="ru" (echo Корневые сертификаты обновлены.) else (echo Root certificates updated.)
     )
@@ -164,12 +177,22 @@ set "_7Z_RC=%ERRORLEVEL%"
 del /Q "%FF_EXE%" >nul 2>&1
 if not "%_7Z_RC%"=="0" (
   if /i "%locale%"=="ru" (echo ОШИБКА: 7-Zip не смог распаковать Firefox. код=%_7Z_RC%.) else (echo ERROR: 7-Zip failed to extract Firefox. rc=%_7Z_RC%.)
-  if not /i "%arg_skipwait%"=="yes" pause
+  if /I "%arg_skipwait%" NEQ "yes" pause
   popd & exit /b 1
 )
 
 REM Keep application.ini (needed to disable updates)
 ren "..\Firefox\App\core" "Firefox" 2>nul
+
+REM If we still don't know FFversion, read it from application.ini after extraction
+if not defined FFversion (
+  for /f "tokens=2 delims==" %%V in ('findstr /I "^Version=" "..\Firefox\App\Firefox\application.ini"') do set "FFversion=%%V"
+  if defined FFversion (
+    if /i "%locale%"=="ru" (echo Определена версия из application.ini: %FFversion%) else (echo Version detected from application.ini: %FFversion%)
+  ) else (
+    if /i "%locale%"=="ru" (echo ПРЕДУПРЕЖДЕНИЕ: версия не определена; загрузка языковых пакетов может не сработать.) else (echo WARNING: Version still unknown; language pack downloads may fail.)
+  )
+)
 
 REM Remove unneeded files safely
 del /Q "..\Firefox\App\Firefox\browser\crashreporter-override.ini"
@@ -217,29 +240,29 @@ if /i "%locale%"=="ru" (
 set "XPI_BASE=https://releases.mozilla.org/pub/firefox/releases/%FFversion%/%xOS%/xpi"
 "%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\langpack-en-US@firefox.mozilla.org.xpi" ^
   "%XPI_BASE%/en-US.xpi" %PROXY_ARGS%
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & if not /i "%arg_skipwait%"=="yes" pause & popd & exit /b 1 ) else ( echo OK! )
+if errorlevel 1 ( echo ERROR:%ErrorLevel% & if /I "%arg_skipwait%" NEQ "yes" pause & popd & exit /b 1 ) else ( echo OK! )
 "%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\langpack-ru@firefox.mozilla.org.xpi" ^
   "%XPI_BASE%/ru.xpi" %PROXY_ARGS%
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & if not /i "%arg_skipwait%"=="yes" pause & popd & exit /b 1 ) else ( echo OK! )
+if errorlevel 1 ( echo ERROR:%ErrorLevel% & if /I "%arg_skipwait%" NEQ "yes" pause & popd & exit /b 1 ) else ( echo OK! )
 
 echo.
 if /i "%locale%"=="ru" (echo Загрузка словарей) else (echo Downloading dictionaries)
 "%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\en-US@dictionaries.addons.mozilla.org.xpi" ^
   "https://addons.mozilla.org/firefox/downloads/latest/english-us-dictionary/latest.xpi" %PROXY_ARGS%
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & if not /i "%arg_skipwait%"=="yes" pause & popd & exit /b 1 ) else ( echo OK! )
+if errorlevel 1 ( echo ERROR:%ErrorLevel% & if /I "%arg_skipwait%" NEQ "yes" pause & popd & exit /b 1 ) else ( echo OK! )
 "%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\ru@dictionaries.addons.mozilla.org.xpi" ^
   "https://addons.mozilla.org/firefox/downloads/latest/russian-spellchecking-dic-3703/latest.xpi" %PROXY_ARGS%
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & if not /i "%arg_skipwait%"=="yes" pause & popd & exit /b 1 ) else ( echo OK! )
+if errorlevel 1 ( echo ERROR:%ErrorLevel% & if /I "%arg_skipwait%" NEQ "yes" pause & popd & exit /b 1 ) else ( echo OK! )
 
 echo.
 if /i "%locale%"=="ru" (
-  echo Загрузка дополнения NoScript (последняя версия)
+  echo Загрузка дополнения NoScript ^(последняя версия^)
 ) else (
-  echo Downloading NoScript extension (latest)
+  echo Downloading NoScript extension ^(latest^)
 )
 "%CURL%" -L -f -# -o "..\Firefox\App\Firefox\browser\extensions\{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi" ^
   "https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi" %PROXY_ARGS%
-if errorlevel 1 ( echo ERROR:%ErrorLevel% & if not /i "%arg_skipwait%"=="yes" pause & popd & exit /b 1 ) else ( echo OK! )
+if errorlevel 1 ( echo ERROR:%ErrorLevel% & if /I "%arg_skipwait%" NEQ "yes" pause & popd & exit /b 1 ) else ( echo OK! )
 
 echo.
 if /i "%locale%"=="ru" (
@@ -264,12 +287,12 @@ if /i "%locale%"=="ru" (
 ) else (
   echo Locating and downloading I2Pd via GitHub API
 )
-set "TMP_JSON=%TEMP%\i2pd_latest_%RANDOM%.json"
+set "TMP_JSON=%TEMP_UNQ%\i2pd_latest_%RANDOM%.json"
 "%CURL%" -L -f -s -o "%TMP_JSON%" "https://api.github.com/repos/PurpleI2P/i2pd/releases/latest" %PROXY_ARGS%
 if errorlevel 1 (
   echo ERROR:%ErrorLevel%
   del /Q "%TMP_JSON%" >nul 2>&1
-  if not /i "%arg_skipwait%"=="yes" pause
+  if /I "%arg_skipwait%" NEQ "yes" pause
   popd & exit /b 1
 )
 
@@ -280,21 +303,21 @@ del /Q "%TMP_JSON%" >nul 2>&1
 
 if not defined I2PD_URL (
   if /i "%locale%"=="ru" (echo ОШИБКА: не удалось получить ссылку i2pd из GitHub API.) else (echo ERROR: couldn't resolve i2pd asset URL from GitHub API.)
-  if not /i "%arg_skipwait%"=="yes" pause
+  if /I "%arg_skipwait%" NEQ "yes" pause
   popd & exit /b 1
 )
 
 "%CURL%" -L -f -# -OJ "%I2PD_URL%" %PROXY_ARGS%
 if errorlevel 1 (
   echo ERROR:%ErrorLevel%
-  if not /i "%arg_skipwait%"=="yes" pause
+  if /I "%arg_skipwait%" NEQ "yes" pause
   popd & exit /b 1
 )
 
 for %%F in (i2pd*_%xOS%_mingw.zip) do set "I2PD_ZIP=%%~nxF"
 if not defined I2PD_ZIP (
   if /i "%locale%"=="ru" (echo ОШИБКА: архив i2pd не найден после загрузки.) else (echo ERROR: i2pd zip not found after download.)
-  if not /i "%arg_skipwait%"=="yes" pause
+  if /I "%arg_skipwait%" NEQ "yes" pause
   popd & exit /b 1
 )
 "%SEVENZIP%" x -y -o"..\i2pd" "%I2PD_ZIP%" i2pd.exe >nul 2>&1
@@ -358,7 +381,7 @@ set "ProxyServer="
 set "REG_PROXY=HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
 for /f "skip=2 tokens=3" %%A in ('reg query "%REG_PROXY%" /v ProxyEnable 2^>nul') do set "ProxyEnable=%%A"
 for /f "skip=2 tokens=2,*" %%A in ('reg query "%REG_PROXY%" /v ProxyServer 2^>nul') do set "ProxyServer=%%B"
-if /i "%ProxyEnable%"=="0x1" if defined ProxyServer set "PROXY_ARGS=-x %ProxyServer%"
+if /i "%ProxyEnable%"=="0x1" if defined ProxyServer set "PROXY_ARGS=-x \"%ProxyServer%\""
 exit /b 0
 
 :GET_ARCH
@@ -382,8 +405,8 @@ if /i "%PA%"=="ARM64" ( set "ARCH_SUPPORTED=0" & set "xOS=unsupported" )
 if /i "%PA%"=="ARM"   ( set "ARCH_SUPPORTED=0" & set "xOS=unsupported" )
 if /i "%PA%"=="IA64"  ( set "ARCH_SUPPORTED=0" & set "xOS=unsupported" )
 
-set "ARCH_DISPLAY=%xOS% (host %PA% %PW%)"
-if /i "%ARCH_SUPPORTED%"=="0" set "ARCH_DISPLAY=unsupported (host %PA% %PW%)"
+set "ARCH_DISPLAY=%xOS% host %PA% %PW%"
+if /i "%ARCH_SUPPORTED%"=="0" set "ARCH_DISPLAY=unsupported host %PA% %PW%"
 exit /b 0
 
 :GET_LOCALE
@@ -407,7 +430,7 @@ if not exist "%OMNI%" (
   if /i "%locale%"=="ru" (echo ВНИМАНИЕ: "%OMNI%" не найден — патчи пропущены.) else (echo WARN: "%OMNI%" not found - skipping patches.)
   exit /b 0
 )
-set "_TMPDIR=%TEMP%\omni_%RANDOM%"
+set "_TMPDIR=%TEMP_UNQ%\omni_%RANDOM%"
 if exist "%_TMPDIR%\NUL" rmdir /S /Q "%_TMPDIR%" >nul 2>&1
 mkdir "%_TMPDIR%" >nul 2>&1
 
