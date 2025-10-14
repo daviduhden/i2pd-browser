@@ -455,22 +455,35 @@ if defined PROCESSOR_ARCHITEW6432 set "HOST_ARCH=%PROCESSOR_ARCHITEW6432%"
 if not defined HOST_ARCH set "HOST_ARCH=x86"
 
 set "xOS=win32"
-if /i "!HOST_ARCH!"=="AMD64" set "xOS=win64"
-if /i "!HOST_ARCH!"=="X64" set "xOS=win64"
+if /i "%HOST_ARCH%"=="AMD64" set "xOS=win64"
+if /i "%HOST_ARCH%"=="X64" set "xOS=win64"
 
-if /i "!HOST_ARCH!"=="ARM" set "xOS=unsupported"
-if /i "!HOST_ARCH!"=="ARM64" set "xOS=unsupported"
-if /i "!HOST_ARCH!"=="AARCH64" set "xOS=unsupported"
-if /i "!HOST_ARCH!"=="IA64" set "xOS=unsupported"
+set "ARCH_UNSUPPORTED="
+if /i "%HOST_ARCH%"=="ARM" set "ARCH_UNSUPPORTED=1"
+if /i "%HOST_ARCH%"=="ARM64" set "ARCH_UNSUPPORTED=1"
+if /i "%HOST_ARCH%"=="AARCH64" set "ARCH_UNSUPPORTED=1"
+if /i "%HOST_ARCH%"=="IA64" set "ARCH_UNSUPPORTED=1"
 
-set "ARCH_DISPLAY=!xOS!"
-set "ARCH_HOST_SUFFIX="
-if defined HOST_ARCH (
-  set "ARCH_HOST_SUFFIX= (host !HOST_ARCH!)"
-  if /i "!HOST_ARCH!"=="AMD64" if /i "!xOS!"=="win64" set "ARCH_HOST_SUFFIX="
-  if /i "!HOST_ARCH!"=="X86" if /i "!xOS!"=="win32" set "ARCH_HOST_SUFFIX="
+if defined ARCH_UNSUPPORTED set "xOS=unsupported"
+
+set "ARCH_DISPLAY=%xOS%"
+if /i "%HOST_ARCH%"=="AMD64" (
+  if /i "%xOS%"=="win64" (
+    rem display already matches; no suffix
+  ) else (
+    set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
+  )
+) else (
+  if /i "%HOST_ARCH%"=="X86" (
+    if /i "%xOS%"=="win32" (
+      rem display already matches; no suffix
+    ) else (
+      set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
+    )
+  ) else (
+    set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
+  )
 )
-set "ARCH_DISPLAY=!xOS!!ARCH_HOST_SUFFIX!"
 exit /b 0
 
 :GET_ARGS
