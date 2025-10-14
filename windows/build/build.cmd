@@ -59,8 +59,8 @@ set "ESR_PRODUCT=firefox-esr-latest"
 echo.
 echo Building I2Pd Browser Portable
 if "%SHOW_RU%"=="1" echo Сборка I2Pd Browser Portable
-echo Browser locale: %locale%, architecture: %xOS%
-if "%SHOW_RU%"=="1" echo Язык браузера: %locale%, архитектура: %xOS%
+echo Browser locale: %locale%, architecture: %ARCH_DISPLAY%
+if "%SHOW_RU%"=="1" echo Язык браузера: %locale%, архитектура: %ARCH_DISPLAY%
 if "%xOS%"=="unsupported" (
   echo ERROR: Unsupported architecture (ARM not supported)
   if "%SHOW_RU%"=="1" echo ОШИБКА: Неподдерживаемая архитектура (ARM не поддерживается)
@@ -103,12 +103,14 @@ echo.
 echo Downloading Firefox ESR installer
 if "%SHOW_RU%"=="1" echo Загрузка установщика Firefox ESR
 
-REM Only win32/win64 are supported
-REM Поддерживаются только win32/win64
+REM Only win32/win64 builds are available (ARM64 reuses win64)
+REM Доступны только сборки win32/win64 (ARM64 использует win64)
 if /i "%xOS%"=="win32" (
   set "dl_os=win32"
 ) else if /i "%xOS%"=="win64" (
   set "dl_os=win64"
+  if /i "%HOST_ARCH%"=="ARM64" set "dl_os=win64-aarch64"
+  if /i "%HOST_ARCH%"=="AARCH64" set "dl_os=win64-aarch64"
 ) else (
   echo ERROR: Unsupported architecture "%xOS%". Only win32/win64 are supported.
   if "%SHOW_RU%"=="1" echo ОШИБКА: Неподдерживаемая архитектура "%xOS%". Поддерживаются только win32/win64.
@@ -445,14 +447,58 @@ if /i "%ProxyEnable%"=="0x1" if defined ProxyServer (
 exit /b 0
 
 :GET_ARCH
-REM Detect architecture (ARM unsupported)
-REM Определить архитектуру (ARM не поддерживается)
+REM Detect architecture (map ARM64 to win64 build, pure ARM unsupported)
+REM Определить архитектуру (ARM64 -> win64, ARM не поддерживается)
 set "xOS=win32"
-REM 64-bit WoW64 or native AMD64 -> win64
-if defined PROCESSOR_ARCHITEW6432 set "xOS=win64"
-if /i "%PROCESSOR_ARCHITECTURE%"=="AMD64" set "xOS=win64"
-REM ARM64 explicitly marked unsupported
-if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "xOS=unsupported"
+set "HOST_ARCH="
+set "ARCH_DISPLAY="
+set "detected_arch="
+
+if defined PROCESSOR_ARCHITEW6432 (
+  set "detected_arch=!PROCESSOR_ARCHITEW6432!"
+) else (
+  set "detected_arch=!PROCESSOR_ARCHITECTURE!"
+)
+
+if not defined detected_arch set "detected_arch=x86"
+set "HOST_ARCH=!detected_arch!"
+
+REM Normalize known 64-bit architectures
+REM Нормализовать известные 64-разрядные архитектуры
+if /i "!detected_arch!"=="AMD64" (
+  set "xOS=win64"
+) else if /i "!detected_arch!"=="X64" (
+  set "xOS=win64"
+) else if /i "!detected_arch!"=="IA64" (
+  set "xOS=win64"
+) else if /i "!detected_arch!"=="ARM64" (
+  set "xOS=win64"
+) else if /i "!detected_arch!"=="AARCH64" (
+  set "xOS=win64"
+) else if /i "!detected_arch!"=="ARM" (
+  set "xOS=unsupported"
+)
+
+set "ARCH_DISPLAY=!xOS!"
+if defined HOST_ARCH (
+  if /i "!HOST_ARCH!"=="ARM64" (
+    set "ARCH_DISPLAY=!xOS! (host ARM64)"
+  ) else if /i "!HOST_ARCH!"=="AARCH64" (
+    set "ARCH_DISPLAY=!xOS! (host AARCH64)"
+  ) else if /i "!HOST_ARCH!"=="IA64" (
+    set "ARCH_DISPLAY=!xOS! (host IA64)"
+  ) else if /i "!HOST_ARCH!"=="AMD64" (
+    if /i "!xOS!" NEQ "win64" set "ARCH_DISPLAY=!xOS! (host AMD64)"
+  ) else if /i "!HOST_ARCH!"=="X86" (
+    if /i "!xOS!" NEQ "win32" set "ARCH_DISPLAY=!xOS! (host x86)"
+  ) else if /i "!HOST_ARCH!"=="X64" (
+    if /i "!xOS!" NEQ "win64" set "ARCH_DISPLAY=!xOS! (host X64)"
+  ) else if /i "!HOST_ARCH!"=="x86" (
+    if /i "!xOS!" NEQ "win32" set "ARCH_DISPLAY=!xOS! (host x86)"
+  ) else (
+    set "ARCH_DISPLAY=!xOS! (host !HOST_ARCH!)"
+  )
+)
 exit /b 0
 
 :GET_ARGS
