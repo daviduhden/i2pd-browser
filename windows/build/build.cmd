@@ -64,7 +64,11 @@ if "%SHOW_RU%"=="1" echo Язык браузера: %locale%, архитекту
 if "%xOS%"=="unsupported" (
   echo ERROR: Unsupported architecture (ARM not supported)
   if "%SHOW_RU%"=="1" echo ОШИБКА: Неподдерживаемая архитектура (ARM не поддерживается)
-  pause & exit /b 1
+  if /i "%arg_skipwait%"=="yes" (
+    exit /b 1
+  ) else (
+    pause & exit /b 1
+  )
 )
 
 echo.
@@ -452,22 +456,22 @@ if defined PROCESSOR_ARCHITEW6432 set "HOST_ARCH=%PROCESSOR_ARCHITEW6432%"
 if not defined HOST_ARCH set "HOST_ARCH=x86"
 
 set "xOS=win32"
-if /i "%HOST_ARCH%"=="AMD64" set "xOS=win64"
-if /i "%HOST_ARCH%"=="X64" set "xOS=win64"
+if /i "!HOST_ARCH!"=="AMD64" set "xOS=win64"
+if /i "!HOST_ARCH!"=="X64" set "xOS=win64"
 
-if /i "%HOST_ARCH%"=="ARM" set "xOS=unsupported"
-if /i "%HOST_ARCH%"=="ARM64" set "xOS=unsupported"
-if /i "%HOST_ARCH%"=="AARCH64" set "xOS=unsupported"
-if /i "%HOST_ARCH%"=="IA64" set "xOS=unsupported"
+if /i "!HOST_ARCH!"=="ARM" set "xOS=unsupported"
+if /i "!HOST_ARCH!"=="ARM64" set "xOS=unsupported"
+if /i "!HOST_ARCH!"=="AARCH64" set "xOS=unsupported"
+if /i "!HOST_ARCH!"=="IA64" set "xOS=unsupported"
 
-set "ARCH_DISPLAY=%xOS%"
+set "ARCH_DISPLAY=!xOS!"
 if defined HOST_ARCH (
-  if /i "%HOST_ARCH%"=="AMD64" (
-    if /i "%xOS%" NEQ "win64" set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
-  ) else if /i "%HOST_ARCH%"=="X86" (
-    if /i "%xOS%" NEQ "win32" set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
+  if /i "!HOST_ARCH!"=="AMD64" (
+    if /i "!xOS!" NEQ "win64" set "ARCH_DISPLAY=!xOS! (host !HOST_ARCH!)"
+  ) else if /i "!HOST_ARCH!"=="X86" (
+    if /i "!xOS!" NEQ "win32" set "ARCH_DISPLAY=!xOS! (host !HOST_ARCH!)"
   ) else (
-    set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
+    set "ARCH_DISPLAY=!xOS! (host !HOST_ARCH!)"
   )
 )
 exit /b 0
