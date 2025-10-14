@@ -44,12 +44,12 @@ if "%ARCH_SUPPORTED%"=="0" (
 
 if /i "%locale%"=="ru" (
   echo Сборка I2Pd Browser Portable
-  echo Язык браузера: %locale%, архитектура: %ARCH_DISPLAY%
+  echo Язык браузера: !locale!, архитектура: !ARCH_DISPLAY!
   echo.
   echo Загрузка установщика Firefox ESR
 ) else (
   echo Building I2Pd Browser Portable
-  echo Browser locale: %locale%, architecture: %ARCH_DISPLAY%
+  echo Browser locale: !locale!, architecture: !ARCH_DISPLAY!
   echo.
   echo Downloading Firefox ESR installer
 )
