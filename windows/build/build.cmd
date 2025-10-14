@@ -447,54 +447,27 @@ exit /b 0
 :GET_ARCH
 REM Detect architecture (mark any ARM as unsupported)
 REM Определить архитектуру (любой ARM не поддерживается)
+set "HOST_ARCH=%PROCESSOR_ARCHITECTURE%"
+if defined PROCESSOR_ARCHITEW6432 set "HOST_ARCH=%PROCESSOR_ARCHITEW6432%"
+if not defined HOST_ARCH set "HOST_ARCH=x86"
+
 set "xOS=win32"
-set "HOST_ARCH="
-set "ARCH_DISPLAY="
-set "detected_arch="
+if /i "%HOST_ARCH%"=="AMD64" set "xOS=win64"
+if /i "%HOST_ARCH%"=="X64" set "xOS=win64"
 
-if defined PROCESSOR_ARCHITEW6432 (
-  set "detected_arch=!PROCESSOR_ARCHITEW6432!"
-) else (
-  set "detected_arch=!PROCESSOR_ARCHITECTURE!"
-)
+if /i "%HOST_ARCH%"=="ARM" set "xOS=unsupported"
+if /i "%HOST_ARCH%"=="ARM64" set "xOS=unsupported"
+if /i "%HOST_ARCH%"=="AARCH64" set "xOS=unsupported"
+if /i "%HOST_ARCH%"=="IA64" set "xOS=unsupported"
 
-if not defined detected_arch set "detected_arch=x86"
-set "HOST_ARCH=!detected_arch!"
-
-REM Normalize known 64-bit architectures
-REM Нормализовать известные 64-разрядные архитектуры
-if /i "!detected_arch!"=="AMD64" (
-  set "xOS=win64"
-) else if /i "!detected_arch!"=="X64" (
-  set "xOS=win64"
-) else if /i "!detected_arch!"=="IA64" (
-  set "xOS=unsupported"
-) else if /i "!detected_arch!"=="ARM64" (
-  set "xOS=unsupported"
-) else if /i "!detected_arch!"=="AARCH64" (
-  set "xOS=unsupported"
-) else if /i "!detected_arch!"=="ARM" (
-  set "xOS=unsupported"
-)
-
-set "ARCH_DISPLAY=!xOS!"
+set "ARCH_DISPLAY=%xOS%"
 if defined HOST_ARCH (
-  if /i "!HOST_ARCH!"=="ARM64" (
-    set "ARCH_DISPLAY=!xOS! (host ARM64)"
-  ) else if /i "!HOST_ARCH!"=="AARCH64" (
-    set "ARCH_DISPLAY=!xOS! (host AARCH64)"
-  ) else if /i "!HOST_ARCH!"=="IA64" (
-    set "ARCH_DISPLAY=!xOS! (host IA64)"
-  ) else if /i "!HOST_ARCH!"=="AMD64" (
-    if /i "!xOS!" NEQ "win64" set "ARCH_DISPLAY=!xOS! (host AMD64)"
-  ) else if /i "!HOST_ARCH!"=="X86" (
-    if /i "!xOS!" NEQ "win32" set "ARCH_DISPLAY=!xOS! (host x86)"
-  ) else if /i "!HOST_ARCH!"=="X64" (
-    if /i "!xOS!" NEQ "win64" set "ARCH_DISPLAY=!xOS! (host X64)"
-  ) else if /i "!HOST_ARCH!"=="x86" (
-    if /i "!xOS!" NEQ "win32" set "ARCH_DISPLAY=!xOS! (host x86)"
+  if /i "%HOST_ARCH%"=="AMD64" (
+    if /i "%xOS%" NEQ "win64" set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
+  ) else if /i "%HOST_ARCH%"=="X86" (
+    if /i "%xOS%" NEQ "win32" set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
   ) else (
-    set "ARCH_DISPLAY=!xOS! (host !HOST_ARCH!)"
+    set "ARCH_DISPLAY=%xOS% (host %HOST_ARCH%)"
   )
 )
 exit /b 0
