@@ -1,15 +1,11 @@
 @ECHO OFF
 REM Copyright (c) 2013-2025, The PurpleI2P Project
-REM Авторские права (c) 2013-2025, The PurpleI2P Project
 REM This file is part of Purple i2pd project and licensed under BSD3
-REM Этот файл — часть проекта Purple i2pd и распространяется по BSD3
 REM See full license text in LICENSE file at top of project tree
-REM Полный текст лицензии см. в файле LICENSE в корне проекта
 
 setlocal EnableExtensions EnableDelayedExpansion
 
 REM Show Russian output ONLY if the system UI language is Russian
-REM Показывать русский вывод ТОЛЬКО если язык интерфейса системы — русский
 set "SHOW_RU=0"
 for /f "tokens=2,*" %%A in ('reg query "HKCU\Control Panel\International" /v LocaleName ^| find "LocaleName"') do set "LOCALE_NAME=%%B"
 if defined LOCALE_NAME (
@@ -18,7 +14,6 @@ if defined LOCALE_NAME (
 )
 
 REM Switch to UTF-8 only when printing Russian (avoid mojibake)
-REM Включать UTF-8 только при печати русского (чтобы избежать кракозябр)
 if "%SHOW_RU%"=="1" chcp 65001 >nul
 
 title Starting I2Pd Browser
@@ -32,7 +27,7 @@ set "fire=firefox.exe"
 set "port=FirefoxPortable.exe"
 set "i2pd=i2pd.exe"
 
-REM Check if Firefox exists / Проверка наличия Firefox
+REM Check if Firefox exists
 if not exist Firefox (
     echo Firefox not found... Starting build...
     if "%SHOW_RU%"=="1" echo Firefox не найден... Начинаю сборку...
@@ -41,11 +36,11 @@ if not exist Firefox (
     popd
 )
 
-REM Kill FirefoxPortable if running / Завершение FirefoxPortable, если запущен
+REM Kill FirefoxPortable if running
 tasklist | find /i "%port%" >nul && (taskkill /im "%port%" /t >nul) && (%$pause% 2 >nul)
 REM tasklist | find /i "%fire%" >nul && (taskkill /im "%fire%" >nul)
 
-REM Check if i2pd is running / Проверка, запущен ли i2pd
+REM Check if i2pd is running
 tasklist | find /i "%i2pd%" >nul && (goto runfox) || (goto starti2p)
 
 :starti2p
@@ -71,8 +66,8 @@ cd "%$cd%"
 exit /b 0
 
 rem ==========================================================================
-rem EchoWithoutCrLf procedure / Процедура EchoWithoutCrLf
-rem %1 : text to output / текст для вывода
+rem EchoWithoutCrLf procedure
+rem %1 : text to output
 rem ==========================================================================
 :EchoWithoutCrLf
     <nul set /p strTemp=%~1
