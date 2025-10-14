@@ -103,14 +103,12 @@ echo.
 echo Downloading Firefox ESR installer
 if "%SHOW_RU%"=="1" echo Загрузка установщика Firefox ESR
 
-REM Only win32/win64 builds are available (ARM64 reuses win64)
-REM Доступны только сборки win32/win64 (ARM64 использует win64)
+REM Only win32/win64 builds are available (ARM is unsupported)
+REM Доступны только сборки win32/win64 (ARM не поддерживается)
 if /i "%xOS%"=="win32" (
   set "dl_os=win32"
 ) else if /i "%xOS%"=="win64" (
   set "dl_os=win64"
-  if /i "%HOST_ARCH%"=="ARM64" set "dl_os=win64-aarch64"
-  if /i "%HOST_ARCH%"=="AARCH64" set "dl_os=win64-aarch64"
 ) else (
   echo ERROR: Unsupported architecture "%xOS%". Only win32/win64 are supported.
   if "%SHOW_RU%"=="1" echo ОШИБКА: Неподдерживаемая архитектура "%xOS%". Поддерживаются только win32/win64.
@@ -447,8 +445,8 @@ if /i "%ProxyEnable%"=="0x1" if defined ProxyServer (
 exit /b 0
 
 :GET_ARCH
-REM Detect architecture (map ARM64 to win64 build, pure ARM unsupported)
-REM Определить архитектуру (ARM64 -> win64, ARM не поддерживается)
+REM Detect architecture (mark any ARM as unsupported)
+REM Определить архитектуру (любой ARM не поддерживается)
 set "xOS=win32"
 set "HOST_ARCH="
 set "ARCH_DISPLAY="
@@ -470,11 +468,11 @@ if /i "!detected_arch!"=="AMD64" (
 ) else if /i "!detected_arch!"=="X64" (
   set "xOS=win64"
 ) else if /i "!detected_arch!"=="IA64" (
-  set "xOS=win64"
+  set "xOS=unsupported"
 ) else if /i "!detected_arch!"=="ARM64" (
-  set "xOS=win64"
+  set "xOS=unsupported"
 ) else if /i "!detected_arch!"=="AARCH64" (
-  set "xOS=win64"
+  set "xOS=unsupported"
 ) else if /i "!detected_arch!"=="ARM" (
   set "xOS=unsupported"
 )
