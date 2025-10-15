@@ -397,6 +397,8 @@ if not defined I2PD_ZIP (
 )
 "%SEVENZIP%" x -y -o"..\i2pd" "%I2PD_ZIP%" i2pd.exe >nul 2>&1
 del /Q "%I2PD_ZIP%" >nul 2>&1
+robocopy ".\i2pd" "..\i2pd" /MOVE /E >nul 2>&1
+rmdir /S /Q ".\i2pd" >nul 2>&1
 
 echo(
 echo I2Pd Browser Portable is ready to start!
