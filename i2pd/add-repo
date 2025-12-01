@@ -2,9 +2,12 @@
 set -euo pipefail
 
 # See the LICENSE file at the top of the project tree for copyright and license details.
-
-# This script adds the Purple I2P APT repository
-# Supported: Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives.
+#
+# This script adds the Purple I2P APT repository.
+# Supported:
+#   - Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives.
+#   - Devuan 5 (daedalus), Devuan 6 (excalibur) (mapped to bookworm/trixie).
+#   - Ubuntu 20.04 (focal), 22.04 (jammy), 24.04 (noble) and Ubuntu-like derivatives.
 # Architectures: native amd64, i386, arm64, armhf only.
 
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
@@ -32,71 +35,110 @@ error() {
 
 get_release() {
     case "$ID" in
-        debian|ubuntu|raspbian)
-            # Prefer DEBIAN_CODENAME / UBUNTU_CODENAME if present
-            if [[ -n "${DEBIAN_CODENAME:-}" ]]; then
-                VERSION_CODENAME="$DEBIAN_CODENAME"
-            fi
-            if [[ -n "${UBUNTU_CODENAME:-}" ]]; then
-                VERSION_CODENAME="$UBUNTU_CODENAME"
-            fi
-
+        ###################################################################
+        # Devuan support
+        ###################################################################
+        devuan)
+            # Devuan uses its own codenames; map them to Debian codenames.
+            #   Devuan 5 "daedalus"   -> Debian 12 "bookworm"
+            #   Devuan 6 "excalibur"  -> Debian 13 "trixie"
             if [[ -z "${VERSION_CODENAME:-}" ]]; then
-                error "Couldn't find VERSION_CODENAME in /etc/os-release. Only Debian/Ubuntu-like systems with this field are supported."
+                error "Could not find VERSION_CODENAME in /etc/os-release on Devuan."
             fi
 
-            RELEASE="$VERSION_CODENAME"
+            case "$VERSION_CODENAME" in
+                *daedalus*)
+                    RELEASE="bookworm"
+                    ;;
+                *excalibur*)
+                    RELEASE="trixie"
+                    ;;
+                *chimaera*)
+                    error "Devuan chimaera (Debian 11) is not supported. Need Devuan daedalus or newer."
+                    ;;
+                *)
+                    error "Unsupported Devuan version '${VERSION_CODENAME}'. Supported: daedalus and excalibur."
+                    ;;
+            esac
+
+            # Use Debian repo layout for Devuan (packages are Debian-compatible).
+            DIST="debian"
             ;;
+        ###################################################################
+        # Native Debian / Raspbian
+        ###################################################################
+        debian|raspbian)
+            if [[ -n "${DEBIAN_CODENAME:-}" ]]; then
+                RELEASE="$DEBIAN_CODENAME"
+            elif [[ -n "${VERSION_CODENAME:-}" ]]; then
+                RELEASE="$VERSION_CODENAME"
+            else
+                error "Couldn't find DEBIAN_CODENAME or VERSION_CODENAME in /etc/os-release."
+            fi
+            DIST="debian"
+            ;;
+        ###################################################################
+        # Native Ubuntu
+        ###################################################################
+        ubuntu)
+            if [[ -n "${UBUNTU_CODENAME:-}" ]]; then
+                RELEASE="$UBUNTU_CODENAME"
+            elif [[ -n "${VERSION_CODENAME:-}" ]]; then
+                RELEASE="$VERSION_CODENAME"
+            else
+                error "Couldn't find UBUNTU_CODENAME or VERSION_CODENAME in /etc/os-release."
+            fi
+            DIST="ubuntu"
+            ;;
+        ###################################################################
+        # Other Debian-/Ubuntu-like systems (derivatives)
+        ###################################################################
         *)
-            # Other Debian-/Ubuntu-like systems
-            if [[ -z "${ID_LIKE:-}" || ( "$ID_LIKE" != "debian" && "$ID_LIKE" != "ubuntu" ) ]]; then
+            if [[ -z "${ID_LIKE:-}" ]]; then
                 error "Your system is not supported. Only Debian-like and Ubuntu-like systems are supported."
             fi
 
-            DIST="$ID_LIKE"
+            # Ubuntu-like derivative (e.g. Linux Mint, Pop!_OS, etc.)
+            if [[ "$ID_LIKE" == *"ubuntu"* ]]; then
+                DIST="ubuntu"
+                if [[ -n "${UBUNTU_CODENAME:-}" ]]; then
+                    RELEASE="$UBUNTU_CODENAME"
+                elif [[ -n "${VERSION_CODENAME:-}" ]]; then
+                    RELEASE="$VERSION_CODENAME"
+                else
+                    error "Couldn't find UBUNTU_CODENAME or VERSION_CODENAME for Ubuntu-like system."
+                fi
 
-            case "$ID_LIKE" in
-                debian)
-                    case "$ID" in
-                        kali)
-                            # Only support Kali releases based on Debian >= bookworm.
-                            # Known mapping: Kali 2023.x -> Debian 12 (bookworm)
-                            if [[ "${VERSION:-}" == 2023* || "${VERSION_ID:-}" == 2023* ]]; then
-                                RELEASE="bookworm"
-                            fi
-                            ;;
-                        parrot)
-                            # Only support Parrot 6.x (bookworm-based)
-                            if [[ "${VERSION:-}" == 6.* || "${VERSION_ID:-}" == 6.* ]]; then
-                                RELEASE="bookworm"
-                            fi
-                            ;;
-                        *)
-                            # Generic Debian-like derivative that exposes DEBIAN_CODENAME
-                            RELEASE="${DEBIAN_CODENAME:-}"
-                            ;;
-                    esac
-                    ;;
-                ubuntu)
-                    RELEASE="${UBUNTU_CODENAME:-}"
-                    ;;
-            esac
+            # Debian-like derivative (generic)
+            elif [[ "$ID_LIKE" == *"debian"* ]]; then
+                DIST="debian"
+                if [[ -n "${DEBIAN_CODENAME:-}" ]]; then
+                    RELEASE="$DEBIAN_CODENAME"
+                elif [[ -n "${VERSION_CODENAME:-}" ]]; then
+                    RELEASE="$VERSION_CODENAME"
+                else
+                    error "Couldn't find DEBIAN_CODENAME or VERSION_CODENAME for Debian-like system."
+                fi
+
+            else
+                error "Your system is not supported. Only Debian-like and Ubuntu-like systems are supported."
+            fi
             ;;
     esac
 
     if [[ -z "$RELEASE" ]]; then
-        error "Couldn't detect a supported system release. This script supports Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives only."
+        error "Couldn't detect a supported system release. This script supports Debian 12 (bookworm), Debian 13 (trixie), Devuan daedalus/excalibur, and Ubuntu focal/jammy/noble only."
     fi
 
-    # Enforce minimum Debian release = bookworm
+    # Enforce minimum base release
     case "$RELEASE" in
         # Debian and derivatives (stable + newer branches)
         bookworm|trixie|forky|sid \
-        # Ubuntu examples (extend if needed)
+        # Ubuntu and derivatives (20.04+, 22.04, 24.04)
         |focal|jammy|noble)
             ;;
         *)
-            error "Unsupported release codename '$RELEASE'. This script supports Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives only."
+            error "Unsupported release codename '$RELEASE'. Supported Debian: bookworm, trixie; Ubuntu: focal, jammy, noble; and corresponding Devuan/derivatives."
             ;;
     esac
 }
