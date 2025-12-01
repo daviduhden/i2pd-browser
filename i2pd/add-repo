@@ -1,0 +1,134 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+# See the LICENSE file at the top of the project tree for copyright and license details.
+
+# This script adds the Purple I2P APT repository
+# Supported: Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives.
+# Architectures: only the ones enabled locally (dpkg --print-architecture / --print-foreign-architectures).
+
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+# Load system release information
+if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+else
+    echo "Error: /etc/os-release not found. Cannot detect distribution."
+    exit 1
+fi
+
+DIST="${ID:-}"
+RELEASE=""
+ARCH_FILTER=""
+
+error() {
+    echo "Error: $*" >&2
+    exit 1
+}
+
+get_release() {
+    case "$ID" in
+        debian|ubuntu|raspbian)
+            # Prefer DEBIAN_CODENAME / UBUNTU_CODENAME if present
+            if [[ -n "${DEBIAN_CODENAME:-}" ]]; then
+                VERSION_CODENAME="$DEBIAN_CODENAME"
+            fi
+            if [[ -n "${UBUNTU_CODENAME:-}" ]]; then
+                VERSION_CODENAME="$UBUNTU_CODENAME"
+            fi
+
+            if [[ -z "${VERSION_CODENAME:-}" ]]; then
+                error "Couldn't find VERSION_CODENAME in /etc/os-release. Only Debian/Ubuntu-like systems with this field are supported."
+            fi
+
+            RELEASE="$VERSION_CODENAME"
+            ;;
+        *)
+            # Other Debian-/Ubuntu-like systems
+            if [[ -z "${ID_LIKE:-}" || ( "$ID_LIKE" != "debian" && "$ID_LIKE" != "ubuntu" ) ]]; then
+                error "Your system is not supported. Only Debian-like and Ubuntu-like systems are supported."
+            fi
+
+            DIST="$ID_LIKE"
+
+            case "$ID_LIKE" in
+                debian)
+                    case "$ID" in
+                        kali)
+                            # Only support Kali releases based on Debian >= bookworm.
+                            # Known mapping: Kali 2023.x -> Debian 12 (bookworm)
+                            if [[ "${VERSION:-}" == 2023* || "${VERSION_ID:-}" == 2023* ]]; then
+                                RELEASE="bookworm"
+                            fi
+                            ;;
+                        parrot)
+                            # Only support Parrot 6.x (bookworm-based)
+                            if [[ "${VERSION:-}" == 6.* || "${VERSION_ID:-}" == 6.* ]]; then
+                                RELEASE="bookworm"
+                            fi
+                            ;;
+                        *)
+                            # Generic Debian-like derivative that exposes DEBIAN_CODENAME
+                            RELEASE="${DEBIAN_CODENAME:-}"
+                            ;;
+                    esac
+                    ;;
+                ubuntu)
+                    RELEASE="${UBUNTU_CODENAME:-}"
+                    ;;
+            esac
+            ;;
+    esac
+
+    if [[ -z "$RELEASE" ]]; then
+        error "Couldn't detect a supported system release. This script supports Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives only."
+    fi
+
+    # Enforce minimum Debian release = bookworm
+    case "$RELEASE" in
+        # Debian and derivatives (stable + newer branches)
+        bookworm|trixie|forky|sid \
+        # Ubuntu examples (extend if needed)
+        |focal|jammy|noble)
+            ;;
+        *)
+            error "Unsupported release codename '$RELEASE'. This script supports Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives only."
+            ;;
+    esac
+}
+
+detect_arch_filter() {
+    # Collect enabled architectures on this system
+    local arches
+    arches="$( (dpkg --print-architecture; dpkg --print-foreign-architectures) 2>/dev/null | sort -u )"
+
+    if [[ -z "$arches" ]]; then
+        error "Could not detect any enabled APT architectures."
+    fi
+
+    # Join them as a comma-separated list: amd64,i386,arm64,armhf,...
+    ARCH_FILTER="$(echo "$arches" | paste -sd',' -)"
+}
+
+get_release
+detect_arch_filter
+
+echo "Detected distribution: $DIST"
+echo "Detected release codename: $RELEASE"
+echo "Using local APT architectures: $ARCH_FILTER"
+
+echo "Importing signing key..."
+install -d -m 0755 /usr/share/keyrings
+wget -q -O- https://repo.i2pd.xyz/r4sas.gpg | gpg --dearmor > /usr/share/keyrings/purplei2p.gpg
+
+echo "Adding APT repository..."
+cat > /etc/apt/sources.list.d/purplei2p.list <<EOF
+deb [arch=${ARCH_FILTER} signed-by=/usr/share/keyrings/purplei2p.gpg] https://repo.i2pd.xyz/$DIST $RELEASE main
+# deb-src [arch=${ARCH_FILTER} signed-by=/usr/share/keyrings/purplei2p.gpg] https://repo.i2pd.xyz/$DIST $RELEASE main
+EOF
+
+echo "Done. You can now run: apt update && apt install i2pd"
