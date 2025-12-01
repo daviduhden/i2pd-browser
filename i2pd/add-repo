@@ -132,3 +132,4 @@ deb [arch=${ARCH_FILTER} signed-by=/usr/share/keyrings/purplei2p.gpg] https://re
 EOF
 
 echo "Done. You can now run: apt update && apt install i2pd"
+exit 0
