@@ -1,5 +1,7 @@
-#!/bin/bash
+#!/usr/bin/bash
 set -euo pipefail
+
+# See the LICENSE file at the top of the project tree for copyright and license details.
 
 # This script adds the Purple I2P APT repository
 # Supported: Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives.
