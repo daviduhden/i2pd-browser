@@ -1,11 +1,9 @@
-#!/usr/bin/bash
+#!/bin/bash
 set -euo pipefail
-
-# See the LICENSE file at the top of the project tree for copyright and license details.
 
 # This script adds the Purple I2P APT repository
 # Supported: Debian 12 (bookworm), Debian 13 (trixie) and newer derivatives.
-# Architectures: only the ones enabled locally (dpkg --print-architecture / --print-foreign-architectures).
+# Architectures: native amd64, i386, arm64, armhf only.
 
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
     echo "This script must be run as root"
@@ -102,16 +100,22 @@ get_release() {
 }
 
 detect_arch_filter() {
-    # Collect enabled architectures on this system
-    local arches
-    arches="$( (dpkg --print-architecture; dpkg --print-foreign-architectures) 2>/dev/null | sort -u )"
+    # Native architecture only
+    local native
+    native="$(dpkg --print-architecture 2>/dev/null || true)"
 
-    if [[ -z "$arches" ]]; then
-        error "Could not detect any enabled APT architectures."
+    if [[ -z "$native" ]]; then
+        error "Could not detect native APT architecture."
     fi
 
-    # Join them as a comma-separated list: amd64,i386,arm64,armhf,...
-    ARCH_FILTER="$(echo "$arches" | paste -sd',' -)"
+    case "$native" in
+        amd64|i386|arm64|armhf)
+            ARCH_FILTER="$native"
+            ;;
+        *)
+            error "Unsupported native architecture '$native'. This repo supports only amd64, i386, arm64, armhf."
+            ;;
+    esac
 }
 
 get_release
@@ -119,7 +123,7 @@ detect_arch_filter
 
 echo "Detected distribution: $DIST"
 echo "Detected release codename: $RELEASE"
-echo "Using local APT architectures: $ARCH_FILTER"
+echo "Using native APT architecture: $ARCH_FILTER"
 
 echo "Importing signing key..."
 install -d -m 0755 /usr/share/keyrings
@@ -132,4 +136,3 @@ deb [arch=${ARCH_FILTER} signed-by=/usr/share/keyrings/purplei2p.gpg] https://re
 EOF
 
 echo "Done. You can now run: apt update && apt install i2pd"
-exit 0
