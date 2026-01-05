@@ -1,126 +1,85 @@
 {
-	"policies": {
-		"AppUpdateURL": "http://127.0.0.1/",
-		"CaptivePortal": false,
-		"Certificates": {
-			"ImportEnterpriseRoots": false
-		},
-		"DNSOverHTTPS": {
-			"Enabled": false,
-			"Locked": true
-		},
-		"DisableAppUpdate": true,
-		"DisableFeedbackCommands": true,
-		"DisableFirefoxAccounts": true,
-		"DisablePocket": true,
-		"DisableFirefoxScreenshots": true,
-		"DisableFirefoxStudies": true,
-		"DisablePasswordReveal": true,
-		"DisableProfileImport": true,
-		"DisableProfileRefresh": true,
-		"DisableSafeMode": true,
-		"DisableSetDesktopBackground": true,
-		"DisableSystemAddonUpdate": true,
-		"DisableTelemetry": true,
-		"DisableWebRTC": true,
-		"DisableFirefoxView": true,
-		"DontCheckDefaultBrowser": true,
-		"ExtensionUpdate": false,
-		"Extensions": {
-			"Locked": [
-				"73a6fe31-595d-460b-a920-fcc0f8843232"
-			]
-		},
-		"FirefoxHome": {
-			"FirefoxView": false,
-			"Highlights": false,
-			"Pocket": false,
-			"Search": true,
-			"Snippets": false,
-			"TopSites": false,
-			"SponsoredTopSites": false
-		},
-		"NetworkPrediction": false,
-		"NoDefaultBookmarks": true,
-		"OfferToSaveLoginsDefault": false,
-		"OverrideFirstRunPage": "http://i2pd.i2p/",
-		"OverridePostUpdatePage": "",
-		"Permissions": {
-			"Camera": { "BlockNewRequests": true },
-			"Location": { "BlockNewRequests": true },
-			"Microphone": { "BlockNewRequests": true }
-		},
-		"PopupBlocking": { "Default": true },
+  "policies": {
+    "DisableAppUpdate": true,
+    "DisableSystemAddonUpdate": true,
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DisableFirefoxAccounts": true,
+    "DisableFirefoxView": true,
+    "DisablePocket": true,
+    "DisableFeedbackCommands": true,
 
-		"Preferences": {
-			"browser.cache.disk.enable": true,
-			"browser.fixup.dns_first_for_single_words": false,
-			"browser.search.update": false,
-			"browser.tabs.warnOnClose": false,
-			"browser.urlbar.suggest.bookmark": true,
-			"browser.urlbar.suggest.history": true,
-			"browser.urlbar.suggest.openpage": true,
-			"datareporting.policy.dataSubmissionPolicyBypassNotification": true,
-			"dom.disable_window_flip": true,
-			"dom.disable_window_move_resize": true,
-			"dom.event.contextmenu.enabled": false,
-			"network.IDN_show_punycode": true,
-			"network.dns.disableIPv6": true,
-			"places.history.enabled": true,
-			"privacy.file_unique_origin": true,
-			"browser.ml.chat.enabled": false,
-			"browser.ml.chat.menu": false,
-			"browser.ml.chat.sidebar": false,
-			"browser.ml.chat.page": false,
-			"browser.ml.chat.page.menuBadge": false,
-			"browser.ml.chat.page.footerBadge": false,
-			"browser.ml.chat.shortcuts": false,
-			"browser.ml.chat.shortcuts.custom": false,
-			"browser.tabs.groups.smart.enabled": false,
-			"sidebar.notification.badge.aichat": false,
-			"browser.newtabpage.activity-stream.showWeather": false,
-			"browser.newtabpage.activity-stream.system.showWeather": false,
-			"browser.urlbar.suggest.weather": false,
-			"browser.urlbar.speculativeConnect.enabled": false,
-			"browser.places.speculativeConnect.enabled": false,
-			"network.predictor.enabled": false,
-			"network.predictor.enable-prefetch": false,
-			"browser.urlbar.quicksuggest.enabled": false,
-			"browser.urlbar.suggest.quicksuggest.nonsponsored": false,
-			"browser.urlbar.suggest.quicksuggest.sponsored": false,
-			"browser.urlbar.trending.featureGate": false,
-			"browser.firefox-view.enabled": false,
-			"browser.tabs.inTitlebar": 0,
-			"browser.toolbars.bookmarks.visibility": "always",
-			"extensions.pocket.enabled": false,
-			"browser.pocket.enabled": false,
-			"signon.autofillForms": false,
-			"signon.formlessCapture.enabled": false
-		},
+    "DNSOverHTTPS": {
+      "Enabled": false,
+      "Locked": true
+    },
 
-		"PromptForDownloadLocation": true,
-		"Proxy": {
-			"AutoLogin": true,
-			"FTPProxy": "127.0.0.1:4444",
-			"HTTPProxy": "127.0.0.1:4444",
-			"Mode": "manual",
-			"SOCKSVersion": 5,
-			"SSLProxy": "127.0.0.1:4444",
-			"UseHTTPProxyForAllProtocols": false,
-			"UseProxyForDNS": true
-		},
-		"SearchBar": "unified",
-		"SearchEngines": {
-			"Default": "YaCy 'legwork'",
-			"Remove": [
-				"Google",
-				"Perplexity"
-			]
-		},
-		"SearchSuggestEnabled": false,
-		"SupportMenu": {
-			"Title": "Ilita IRC",
-			"URL": "http://irc.r4sas.i2p/?nick=WebClient...&channels=dev%2Cen%2Cru&prompt=1&uio=OT10cnVlde"
-		}
-	}
+    "CaptivePortal": false,
+    "NetworkPrediction": false,
+    "DontCheckDefaultBrowser": true,
+
+    "OverrideFirstRunPage": "http://i2pd.i2p/",
+    "OverridePostUpdatePage": "",
+
+    "Proxy": {
+      "Mode": "manual",
+      "HTTPProxy": "127.0.0.1:4444",
+      "SSLProxy": "127.0.0.1:4444",
+      "FTPProxy": "127.0.0.1:4444",
+      "UseProxyForDNS": true
+    },
+
+    "SearchEngines": {
+      "Default": "YaCy",
+      "PreventInstalls": true,
+      "Add": [
+        {
+          "Name": "YaCy",
+          "URLTemplate": "http://legwork.i2p/yacysearch.html?query={searchTerms}"
+        }
+      ],
+      "Remove": [
+        "Google",
+        "Bing",
+        "DuckDuckGo",
+        "Yahoo",
+        "Amazon.com",
+        "eBay",
+        "Wikipedia (en)",
+		"Perplexity"
+      ]
+    },
+
+    "SearchSuggestEnabled": false,
+	
+	"FirefoxHome": {
+		"Search": true,
+		"TopSites": false,
+		"Highlights": false,
+		"Pocket": false,
+		"Snippets": false,
+		"SponsoredTopSites": false,
+		"FirefoxView": false
+	},
+
+	"SupportMenu": { 
+		"Title": "ILITA IRC", 
+		"URL": "http://irc.r4sas.i2p/?nick=WebClient...&channels=dev%2Cen%2Cru&prompt=1&uio=OT10cnVlde"
+	},
+
+    "Permissions": {
+      "Camera": { "BlockNewRequests": true },
+      "Microphone": { "BlockNewRequests": true },
+      "Location": { "BlockNewRequests": true }
+    },
+
+    "Preferences": {
+      "browser.ml.chat.enabled": false,
+      "browser.ml.chat.menu": false,
+      "browser.ml.chat.sidebar": false,
+      "browser.ml.chat.page": false,
+      "browser.ml.chat.shortcuts": false,
+      "sidebar.notification.badge.aichat": false
+    }
+  }
 }
