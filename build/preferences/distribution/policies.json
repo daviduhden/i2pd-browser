@@ -12,6 +12,7 @@
 		"DisableAppUpdate": true,
 		"DisableFeedbackCommands": true,
 		"DisableFirefoxAccounts": true,
+		"DisablePocket": true,
 		"DisableFirefoxScreenshots": true,
 		"DisableFirefoxStudies": true,
 		"DisablePasswordReveal": true,
@@ -21,6 +22,8 @@
 		"DisableSetDesktopBackground": true,
 		"DisableSystemAddonUpdate": true,
 		"DisableTelemetry": true,
+		"DisableWebRTC": true,
+		"DisableFirefoxView": true,
 		"DontCheckDefaultBrowser": true,
 		"ExtensionUpdate": false,
 		"Extensions": {
@@ -29,6 +32,7 @@
 			]
 		},
 		"FirefoxHome": {
+			"FirefoxView": false,
 			"Highlights": false,
 			"Pocket": false,
 			"Search": true,
@@ -88,6 +92,8 @@
 			"browser.firefox-view.enabled": false,
 			"browser.tabs.inTitlebar": 0,
 			"browser.toolbars.bookmarks.visibility": "always",
+			"extensions.pocket.enabled": false,
+			"browser.pocket.enabled": false,
 			"signon.autofillForms": false,
 			"signon.formlessCapture.enabled": false
 		},
