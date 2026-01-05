@@ -166,6 +166,9 @@ fi
 # Set HOME to the current directory to avoid touching the real user profile
 export HOME="$PWD"
 
+# Remove LD_PRELOAD to avoid forcing injected libraries into the browser
+unset LD_PRELOAD || true
+
 # Avoid overwriting user dconf values
 export GSETTINGS_BACKEND=memory
 
