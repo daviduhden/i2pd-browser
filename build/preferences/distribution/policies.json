@@ -85,6 +85,7 @@
 			"browser.urlbar.suggest.quicksuggest.nonsponsored": false,
 			"browser.urlbar.suggest.quicksuggest.sponsored": false,
 			"browser.urlbar.trending.featureGate": false,
+			"browser.firefox-view.enabled": false,
 			"browser.tabs.inTitlebar": 0,
 			"browser.toolbars.bookmarks.visibility": "always",
 			"signon.autofillForms": false,
