@@ -8,19 +8,15 @@
     "DisableFirefoxView": true,
     "DisablePocket": true,
     "DisableFeedbackCommands": true,
-
     "DNSOverHTTPS": {
       "Enabled": false,
       "Locked": true
     },
-
     "CaptivePortal": false,
     "NetworkPrediction": false,
     "DontCheckDefaultBrowser": true,
-
     "OverrideFirstRunPage": "http://i2pd.i2p/",
     "OverridePostUpdatePage": "",
-
     "Proxy": {
       "Mode": "manual",
       "HTTPProxy": "127.0.0.1:4444",
@@ -28,7 +24,6 @@
       "FTPProxy": "127.0.0.1:4444",
       "UseProxyForDNS": true
     },
-
     "SearchEngines": {
       "Default": "YaCy",
       "PreventInstalls": true,
@@ -46,33 +41,34 @@
         "Amazon.com",
         "eBay",
         "Wikipedia (en)",
-		"Perplexity"
+        "Perplexity"
       ]
     },
-
     "SearchSuggestEnabled": false,
-	
-	"FirefoxHome": {
-		"Search": true,
-		"TopSites": false,
-		"Highlights": false,
-		"Pocket": false,
-		"Snippets": false,
-		"SponsoredTopSites": false,
-		"FirefoxView": false
-	},
-
-	"SupportMenu": { 
-		"Title": "ILITA IRC", 
-		"URL": "http://irc.r4sas.i2p/?nick=WebClient...&channels=dev%2Cen%2Cru&prompt=1&uio=OT10cnVlde"
-	},
-
-    "Permissions": {
-      "Camera": { "BlockNewRequests": true },
-      "Microphone": { "BlockNewRequests": true },
-      "Location": { "BlockNewRequests": true }
+    "FirefoxHome": {
+      "Search": true,
+      "TopSites": false,
+      "Highlights": false,
+      "Pocket": false,
+      "Snippets": false,
+      "SponsoredTopSites": false,
+      "FirefoxView": false
     },
-
+    "SupportMenu": {
+      "Title": "ILITA IRC",
+      "URL": "http://irc.r4sas.i2p/?nick=WebClient...&channels=dev%2Cen%2Cru&prompt=1&uio=OT10cnVlde"
+    },
+    "Permissions": {
+      "Camera": {
+        "BlockNewRequests": true
+      },
+      "Microphone": {
+        "BlockNewRequests": true
+      },
+      "Location": {
+        "BlockNewRequests": true
+      }
+    },
     "Preferences": {
       "browser.ml.chat.enabled": false,
       "browser.ml.chat.menu": false,

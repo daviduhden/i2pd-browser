@@ -7,65 +7,112 @@
 # The script also verifies the system architecture and the presence of 'screen',
 # and then starts I2Pd in a detached screen session if all conditions are met.
 
-# Function to check if I2Pd is running
-check_i2pd_running() {
-		# Use pgrep to check if i2pd is running
-		if pgrep -x "i2pd" > /dev/null; then
-				echo "I2Pd is installed and running."
-		else
-				echo "I2Pd is installed but not running. Please start I2Pd to proceed."
+set -Eeuo pipefail
+
+# Simple colors for messages
+if [[ -t 1 && "${NO_COLOR:-0}" != "1" ]]; then
+	GREEN="\033[32m"
+	YELLOW="\033[33m"
+	RED="\033[31m"
+	RESET="\033[0m"
+else
+	GREEN=""
+	YELLOW=""
+	RED=""
+	RESET=""
+fi
+
+log() { printf '%s %b[INFO]%b ✅ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$GREEN" "$RESET" "$*"; }
+warn() { printf '%s %b[WARN]%b ⚠️ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$YELLOW" "$RESET" "$*"; }
+error() { printf '%s %b[ERROR]%b ❌ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$RED" "$RESET" "$*" >&2; }
+
+i2pd_path=""
+arch=""
+
+find_i2pd_path() {
+	local -a possible_locations=(
+		"/usr/sbin/i2pd"
+		"/usr/local/sbin/i2pd"
+		"/usr/bin/i2pd"
+		"/usr/local/bin/i2pd"
+		"/sbin/i2pd"
+		"/bin/i2pd"
+		"/home/linuxbrew/.linuxbrew/bin/i2pd"
+		"/home/linuxbrew/.linuxbrew/sbin/i2pd"
+	)
+	local location
+	local brew_prefix
+
+	if command -v i2pd >/dev/null 2>&1; then
+		i2pd_path="$(command -v i2pd)"
+		return 0
+	fi
+
+	if command -v brew >/dev/null 2>&1; then
+		brew_prefix="$(brew --prefix 2>/dev/null || true)"
+		if [[ -n "$brew_prefix" ]]; then
+			possible_locations+=(
+				"$brew_prefix/bin/i2pd"
+				"$brew_prefix/sbin/i2pd"
+			)
 		fi
+	fi
+
+	for location in "${possible_locations[@]}"; do
+		if [[ -x "$location" ]]; then
+			i2pd_path="$location"
+			return 0
+		fi
+	done
+
+	return 1
 }
 
-# Define possible locations where i2pd binary might be found
-possible_locations="
-/usr/sbin/i2pd
-/usr/local/sbin/i2pd
-/usr/bin/i2pd
-/usr/local/bin/i2pd
-/sbin/i2pd
-/bin/i2pd
-"
+check_i2pd_running() {
+	if pgrep -x "i2pd" >/dev/null; then
+		log "i2pd is installed and already running"
+	else
+		warn "i2pd is installed but not running; starting it now"
+	fi
+}
 
-# Initialize a flag to indicate if i2pd was found
-i2pd_found=false
-
-# Iterate over each possible location to check if i2pd binary exists and is executable
-for location in $possible_locations; do
-		if [ -x "$location" ]; then
-				# If executable binary is found, set the path and update the flag
-				i2pd_path="$location"
-				i2pd_found=true
-				break
-		fi
-done
-
-# Check if i2pd was found in the possible locations
-if [ "$i2pd_found" = true ]; then
-		# If found, check if it is running
-		check_i2pd_running
-else
-		# If not found, print an error message and exit
-		echo "I2Pd is not installed or not found in standard locations. Please install I2Pd to proceed using the browser."
-		echo "https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux"
+check_prereqs() {
+	if ! find_i2pd_path; then
+		error "i2pd not found in standard or Homebrew locations"
+		error "Install guide: https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux"
 		exit 1
-fi
+	fi
 
-# Get the system architecture
-arch=$(uname -m)
-
-# Check if 'screen' is installed
-if ! command -v screen >/dev/null 2>&1; then
-		echo "Can't find 'screen' installed. This script needs it!"
+	if ! command -v screen >/dev/null 2>&1; then
+		error "Required command 'screen' not found"
 		exit 1
-fi
+	fi
+}
 
-# Check the system architecture and start i2pd in a screen session
-if [ "$arch" = "x86_64" ] || [ "$arch" = "i686" ]; then
-		# Start i2pd using screen in detached mode with the found path
-		screen -Adm -S i2pd "$i2pd_path" --datadir=.
-else
-		# If the architecture is not supported, print an error message and exit
-		echo "Your system architecture is not supported."
-		exit 1
-fi
+check_arch() {
+	arch="$(uname -m)"
+
+	case "$arch" in
+		x86_64|amd64|i686|i386|arm64|aarch64)
+			return 0
+			;;
+		*)
+			error "Unsupported system architecture: $arch"
+			exit 1
+			;;
+	esac
+}
+
+start_i2pd() {
+	log "Starting i2pd with binary: $i2pd_path"
+	screen -Adm -S i2pd "$i2pd_path" --datadir=.
+}
+
+main() {
+	check_prereqs
+	check_i2pd_running
+	check_arch
+	start_i2pd
+}
+
+main "$@"
