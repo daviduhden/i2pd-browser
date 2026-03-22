@@ -7,17 +7,33 @@
 # error reporting and desktop application registration.
 
 set -Eeuo pipefail
-trap 'echo "[Error] A problem occurred on line $LINENO." >&2' ERR
+
+if [[ -t 1 && "${NO_COLOR:-0}" != "1" ]]; then
+	GREEN="\033[32m"
+	YELLOW="\033[33m"
+	RED="\033[31m"
+	RESET="\033[0m"
+else
+	GREEN=""
+	YELLOW=""
+	RED=""
+	RESET=""
+fi
+
+log() { printf '%s %b[INFO]%b ✅ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$GREEN" "$RESET" "$*"; }
+warn() { printf '%s %b[WARN]%b ⚠️ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$YELLOW" "$RESET" "$*"; }
+error() { printf '%s %b[ERROR]%b ❌ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$RED" "$RESET" "$*" >&2; }
+
+trap 'error "Unhandled error at line $LINENO."' ERR
 
 complain_dialog_title="I2Pd Browser"
 
-# Unset the session manager to prevent unwanted connections
-unset SESSION_MANAGER
-
 # Display error messages (GUI if possible, otherwise stderr when --verbose)
 complain() {
-	# Trim leading newlines
-	complain_message="$(echo "$1" | sed '/./,$!d')"
+	local complain_message="$1"
+
+	# Trim leading newlines using parameter expansion
+	complain_message="${complain_message#"${complain_message%%[!$'\n']*}"}"
 
 	# If in verbose mode, output to stderr
 	if [[ "${show_output:-0}" -eq 1 ]]; then
@@ -31,18 +47,6 @@ complain() {
 	if xmessage -title "$complain_dialog_title" -center -buttons OK -default OK -xrm '*message.scrollVertical: Never' "$complain_message"; then return; fi
 	gxmessage -title "$complain_dialog_title" -center -buttons GTK_STOCK_OK -default OK "$complain_message" || true
 }
-
-# Do not run the script as root
-if [[ "$(id -u)" -eq 0 ]]; then
-	complain "The I2Pd Browser Bundle should not be run as root. Exiting."
-	exit 1
-fi
-
-# Ensure CPU supports SSE2 instructions
-if [[ -r /proc/cpuinfo ]] && ! grep -q '^flags\s*:.* sse2' /proc/cpuinfo; then
-	complain "I2Pd Browser requires a CPU with SSE2 support. Exiting."
-	exit 1
-fi
 
 # Show script usage
 browser_usage() {
@@ -60,134 +64,193 @@ detach=0
 show_usage=0
 register_desktop_app=0
 logfile=/dev/null
+myname=""
+mydir=""
+browser_args=()
 
-# Parse command-line options
-while :; do
-	case "${1-}" in
-		--detach)
-			detach=1; shift ;;
-		-v|--verbose|-d|--debug)
-			show_output=1; shift ;;
-		-h|"-?"|--help|-help)
-			show_usage=1; show_output=1; shift ;;
-		-l|--log)
-			if [[ -z "${2-}" || "${2#-}" != "$2" ]]; then
-				printf "Logging I2Pd Browser debug information to i2pd-browser.log\n"
-				logfile="../i2pd-browser.log"
-			elif [[ "${2#/}" = "$2" && "${2#~}" = "$2" ]]; then
-				printf "Logging I2Pd Browser debug information to %s\n" "$2"
-				logfile="../$2"
-				shift
-			else
-				printf "Logging I2Pd Browser debug information to %s\n" "$2"
-				logfile="$2"
-				shift
+check_runtime() {
+	local cpu_arch
+
+	if [[ "$(id -u)" -eq 0 ]]; then
+		complain "The I2Pd Browser Bundle should not be run as root. Exiting."
+		exit 1
+	fi
+
+	cpu_arch="$(uname -m)"
+	case "$cpu_arch" in
+		x86_64|amd64|i386|i686)
+			if [[ -r /proc/cpuinfo ]] && ! grep -q '^flags\s*:.* sse2' /proc/cpuinfo; then
+				complain "I2Pd Browser requires a CPU with SSE2 support. Exiting."
+				exit 1
 			fi
-			log_output=1
-			shift
 			;;
-		--register-app)
-			register_desktop_app=1; show_output=1; shift ;;
-		--unregister-app)
-			register_desktop_app=-1; show_output=1; shift ;;
-		*) # No more options
-			break ;;
 	esac
-done
 
-# Do not detach if we are showing output
-if [[ "$show_output" -eq 1 && "$detach" -eq 1 ]]; then
-	detach=0
-fi
+	unset SESSION_MANAGER
+}
 
-# Redirect stdout and stderr unless in verbose mode
-if [[ "$show_output" -eq 0 ]]; then
-	exec >"$logfile"
-	exec 2>"$logfile"
-fi
+parse_args() {
+	browser_args=("$@")
+	set -- "${browser_args[@]}"
 
-# Set XAUTHORITY to its default value if unset
-if [[ -z "${XAUTHORITY-}" ]]; then
-	export XAUTHORITY="$HOME/.Xauthority"
-fi
+	while :; do
+		case "${1-}" in
+			--detach)
+				detach=1; shift ;;
+			-v|--verbose|-d|--debug)
+				show_output=1; shift ;;
+			-h|"-?"|--help|-help)
+				show_usage=1; show_output=1; shift ;;
+			-l|--log)
+				if [[ -z "${2-}" || "${2#-}" != "$2" ]]; then
+					log "Firefox log file: ../i2pd-browser.log"
+					logfile="../i2pd-browser.log"
+				elif [[ "${2#/}" = "$2" && "${2#~}" = "$2" ]]; then
+					log "Firefox log file: ../$2"
+					logfile="../$2"
+					shift
+				else
+					log "Firefox log file: $2"
+					logfile="$2"
+					shift
+				fi
+				log_output=1
+				shift
+				;;
+			--register-app)
+				register_desktop_app=1; show_output=1; shift ;;
+			--unregister-app)
+				register_desktop_app=-1; show_output=1; shift ;;
+			*)
+				break ;;
+		esac
+	done
 
-# Resolve the script's real path if it's a symlink
-myname="$0"
-if [[ -L "$myname" ]]; then
-	if possibly_my_real_name="$(realpath "$myname" 2>/dev/null)"; then
-		myname="$possibly_my_real_name"
-	else
-		if ! myname="$(readlink -f "$myname" 2>/dev/null)"; then
-			complain "start-i2pd-browser cannot be run using a symlink on this operating system."
+	if [[ "$show_output" -eq 1 && "$detach" -eq 1 ]]; then
+		detach=0
+	fi
+
+	browser_args=("$@")
+}
+
+configure_output() {
+	if [[ "$show_output" -eq 0 ]]; then
+		exec >"$logfile"
+		exec 2>"$logfile"
+	fi
+}
+
+resolve_script_path() {
+	local possibly_my_real_name
+
+	myname="$0"
+	if [[ -L "$myname" ]]; then
+		if possibly_my_real_name="$(realpath "$myname" 2>/dev/null)"; then
+			myname="$possibly_my_real_name"
+		else
+			if ! myname="$(readlink -f "$myname" 2>/dev/null)"; then
+				complain "start-i2pd-browser cannot be run using a symlink on this operating system."
+			fi
 		fi
 	fi
-fi
 
-# Change directory to where the script is located
-mydir="$(dirname "$myname")"
-[[ -d "$mydir" ]] && cd "$mydir"
+	mydir="$(dirname "$myname")"
+	[[ -d "$mydir" ]] && cd "$mydir"
+}
 
-# Fallback for systems with broken shell environments
-if [[ -z "${PWD-}" ]]; then
-	PWD="$(pwd)"
-fi
-
-# Workaround for ibus issue on some Linux systems
-if [[ ! -d ".config/ibus" ]]; then
-	mkdir -p .config/ibus
-	ln -nsf ~/.config/ibus/bus .config/ibus
-fi
-
-# Update .desktop file paths
-cp start-i2pd-browser.desktop ../
-sed -i -e "s,^Exec=.*,Exec=sh -c '\"$PWD/start-i2pd-browser\" --detach || ([ ! -x \"$PWD/start-i2pd-browser\" ] && \"\$(dirname \"\$*\")\"/Browser/start-i2pd-browser --detach)' dummy %k,g" \
-	../start-i2pd-browser.desktop
-
-# Register or unregister the desktop application
-if [[ "$register_desktop_app" -eq 1 ]]; then
-	mkdir -p "$HOME/.local/share/i2pd-browser/"
-	cp ../start-i2pd-browser.desktop "$HOME/.local/share/i2pd-browser/"
-	update-desktop-database "$HOME/.local/share/i2pd-browser/" || true
-	printf "I2Pd Browser has been registered as a desktop app for this user in ~/.local/share/i2pd-browser/\n"
-	exit 0
-fi
-
-if [[ "$register_desktop_app" -eq -1 ]]; then
-	if [[ -e "$HOME/.local/share/i2pd-browser/start-i2pd-browser.desktop" ]]; then
-		rm -f "$HOME/.local/share/i2pd-browser/start-i2pd-browser.desktop"
-		update-desktop-database "$HOME/.local/share/i2pd-browser/" || true
-		printf "I2Pd Browser has been removed as a user desktop app (from ~/.local/share/i2pd-browser/)\n"
-	else
-		printf "I2Pd Browser does not appear to be a desktop app (not present in ~/.local/share/i2pd-browser/)\n"
+setup_shell_env() {
+	if [[ -z "${XAUTHORITY-}" ]]; then
+		export XAUTHORITY="$HOME/.Xauthority"
 	fi
-	exit 0
-fi
 
-# Set HOME to the current directory to avoid touching the real user profile
-export HOME="$PWD"
+	if [[ -z "${PWD-}" ]]; then
+		PWD="$(pwd)"
+	fi
+}
 
-# Remove LD_PRELOAD to avoid forcing injected libraries into the browser
-unset LD_PRELOAD || true
+setup_ibus_workaround() {
+	if [[ ! -d ".config/ibus" ]]; then
+		mkdir -p .config/ibus
+		ln -nsf ~/.config/ibus/bus .config/ibus
+	fi
+}
 
-# Avoid overwriting user dconf values
-export GSETTINGS_BACKEND=memory
+update_desktop_launcher() {
+	cp start-i2pd-browser.desktop ../
+	sed -i -e "s,^Exec=.*,Exec=sh -c '\"$PWD/start-i2pd-browser\" --detach || ([ ! -x \"$PWD/start-i2pd-browser\" ] && \"\$(dirname \"\$*\")\"/Browser/start-i2pd-browser --detach)' dummy %k,g" \
+		../start-i2pd-browser.desktop
+}
 
-# Move to the working directory
-cd "$HOME"
+handle_app_registration() {
+	if [[ "$register_desktop_app" -eq 1 ]]; then
+		mkdir -p "$HOME/.local/share/i2pd-browser/"
+		cp ../start-i2pd-browser.desktop "$HOME/.local/share/i2pd-browser/"
+		update-desktop-database "$HOME/.local/share/i2pd-browser/" || true
+		log "Desktop entry registered at ~/.local/share/i2pd-browser/"
+		exit 0
+	fi
 
-# Display usage information or run the browser
-if [[ "$show_usage" -eq 1 ]]; then
-	./firefox --class "I2Pd Browser" -profile data --help 2>/dev/null
-	browser_usage
-elif [[ "$detach" -eq 1 ]]; then
-	./firefox --class "I2Pd Browser" -profile data "$@" >"$logfile" 2>&1 </dev/null &
-	disown "$!"
-elif [[ "$log_output" -eq 1 && "$show_output" -eq 1 ]]; then
-	./firefox --class "I2Pd Browser" -profile data "$@" 2>&1 </dev/null | tee "$logfile"
-elif [[ "$show_output" -eq 1 ]]; then
-	./firefox --class "I2Pd Browser" -profile data "$@" </dev/null
-else
+	if [[ "$register_desktop_app" -eq -1 ]]; then
+		if [[ -e "$HOME/.local/share/i2pd-browser/start-i2pd-browser.desktop" ]]; then
+			rm -f "$HOME/.local/share/i2pd-browser/start-i2pd-browser.desktop"
+			update-desktop-database "$HOME/.local/share/i2pd-browser/" || true
+			log "Desktop entry removed from ~/.local/share/i2pd-browser/"
+		else
+			warn "Desktop entry not found in ~/.local/share/i2pd-browser/"
+		fi
+		exit 0
+	fi
+}
+
+prepare_browser_env() {
+	export HOME="$PWD"
+	unset LD_PRELOAD || true
+	export GSETTINGS_BACKEND=memory
+	cd "$HOME"
+}
+
+run_browser() {
+	local rc=0
+
+	if [[ "$show_usage" -eq 1 ]]; then
+		./firefox --class "I2Pd Browser" -profile data --help 2>/dev/null
+		browser_usage
+		return 0
+	fi
+
+	if [[ "$detach" -eq 1 ]]; then
+		./firefox --class "I2Pd Browser" -profile data "$@" >"$logfile" 2>&1 </dev/null &
+		disown "$!"
+		return 0
+	fi
+
+	if [[ "$log_output" -eq 1 && "$show_output" -eq 1 ]]; then
+		./firefox --class "I2Pd Browser" -profile data "$@" 2>&1 </dev/null | tee "$logfile"
+		rc=$?
+		return "$rc"
+	fi
+
+	if [[ "$show_output" -eq 1 ]]; then
+		./firefox --class "I2Pd Browser" -profile data "$@" </dev/null
+		rc=$?
+		return "$rc"
+	fi
+
 	./firefox --class "I2Pd Browser" -profile data "$@" >"$logfile" 2>&1 </dev/null
-fi
+}
 
-exit $?
+main() {
+	check_runtime
+	parse_args "$@"
+	configure_output
+	resolve_script_path
+	setup_shell_env
+	setup_ibus_workaround
+	update_desktop_launcher
+	handle_app_registration
+	prepare_browser_env
+	run_browser "${browser_args[@]}"
+	exit $?
+}
+
+main "$@"
