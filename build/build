@@ -9,134 +9,214 @@
 
 set -Eeuo pipefail
 
-trap 'echo "[Error] A problem occurred on line $LINENO." >&2' ERR
+trap 'error "Unhandled error at line $LINENO."' ERR
 
 # Helper functions
-die() { echo "[Error] $*" >&2; exit 1; }
+if [[ -t 1 && "${NO_COLOR:-0}" != "1" ]]; then
+	GREEN="\033[32m"
+	YELLOW="\033[33m"
+	RED="\033[31m"
+	RESET="\033[0m"
+else
+	GREEN=""
+	YELLOW=""
+	RED=""
+	RESET=""
+fi
+
+log() { printf '%s %b[INFO]%b ✅ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$GREEN" "$RESET" "$*"; }
+warn() { printf '%s %b[WARN]%b ⚠️ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$YELLOW" "$RESET" "$*"; }
+error() { printf '%s %b[ERROR]%b ❌ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$RED" "$RESET" "$*" >&2; }
+
+die() { error "$*"; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "'$1' is required but not installed."; }
 
-# Change to the directory where this script lives
-dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)"
-cd "$dir" || die "Could not access the script directory: $dir"
+readonly -a REQUIRED_TOOLS=(
+	curl
+	sha512sum
+	grep
+	sed
+	tar
+	awk
+	jq
+)
 
-# Detect system architecture
-arch="$(uname -m)"
-
-# Configuration
+dir=""
+arch=""
 language="${language:-en-US}"
 ESR_PRODUCT="${ESR_PRODUCT:-firefox-esr-latest}"
+fx_os=""
+fx_dir=""
+final_url=""
+file=""
+version=""
+ftpmirror=""
+filepath=""
 
-# Check required tools
-need curl
-need sha512sum
-need grep
-need sed
-need tar
-need awk
+setup_workdir() {
+	dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)"
+	cd "$dir" || die "Could not access the script directory: $dir"
+}
 
-# Map architecture for redirector (os=) and for checksums path (linux-*)
-case "$arch" in
-	amd64|x86_64)
-		arch=x86_64
-		fx_os="linux64"
-		fx_dir="linux-x86_64"
-		;;
-	i386|i686)
-		arch=i686
-		fx_os="linux"
-		fx_dir="linux-i686"
-		;;
-	*)
-		die "Your system architecture is not supported: $arch"
-		;;
-esac
+check_tools() {
+	local tool
+	for tool in "${REQUIRED_TOOLS[@]}"; do
+		need "$tool"
+	done
+}
 
-echo "Discovering the latest Firefox ESR for $fx_os ($arch), language: $language ..."
-final_url="$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
-	"https://download.mozilla.org/?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")" || die "Failed to query the redirector."
+detect_arch() {
+	arch="$(uname -m)"
 
-[[ -n "$final_url" ]] || die "Could not resolve the Firefox download URL via the redirector."
+	case "$arch" in
+		amd64|x86_64)
+			arch=x86_64
+			fx_os="linux64"
+			fx_dir="linux-x86_64"
+			;;
+		arm64|aarch64)
+			arch=aarch64
+			fx_os="linux64-aarch64"
+			fx_dir="linux-aarch64"
+			;;
+		i386|i686)
+			arch=i686
+			fx_os="linux"
+			fx_dir="linux-i686"
+			;;
+		*)
+			die "Your system architecture is not supported: $arch"
+			;;
+	esac
+}
 
-file="$(basename "$final_url")"
+resolve_latest_firefox() {
+	log "Resolving latest Firefox ESR for $fx_os ($arch), language: $language"
+	final_url="$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
+		"https://download.mozilla.org/?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")" || die "Failed to query the redirector."
 
-# Try to extract the version from the filename
-if [[ "$file" =~ ^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$ ]]; then
-	version="${BASH_REMATCH[1]}"
-else
-	die "Could not parse the version from filename: $file"
-fi
+	[[ -n "$final_url" ]] || die "Could not resolve the Firefox download URL via the redirector."
 
-ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
-filepath="$fx_dir/$language/$file"
+	file="$(basename "$final_url")"
 
-echo "This script will prepare Firefox version $version for use with I2Pd."
+	if [[ "$file" =~ ^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$ ]]; then
+		version="${BASH_REMATCH[1]}"
+	else
+		die "Could not parse the version from filename: $file"
+	fi
 
-# Download Firefox (from the resolved final URL)
-echo "Downloading Firefox $version..."
-curl -L -f -# -O "$final_url" || die "Could not download the file. Check your internet connection."
+	ftpmirror="https://ftp.mozilla.org/pub/firefox/releases/$version"
+	filepath="$fx_dir/$language/$file"
 
-[[ -f "$file" ]] || die "Downloaded file not found: $file"
+	log "Preparing Firefox version $version for use with I2Pd"
+}
 
-# Download and verify the checksums file
-echo "Downloading checksums and verifying SHA512..."
-curl -L -f -# -O "$ftpmirror/SHA512SUMS" || die "Could not download SHA512SUMS."
+download_firefox() {
+	log "Downloading Firefox $version"
+	curl -L -f -# -O "$final_url" || die "Could not download the file. Check your internet connection."
+	[[ -f "$file" ]] || die "Downloaded file not found: $file"
+}
 
-# Get the expected checksum from the line whose last field matches $filepath
-recv_sum="$(awk -v f="$filepath" '$NF==f {print $1; exit}' SHA512SUMS)"
-file_sum="$(sha512sum "$file" | awk '{print $1}')"
+verify_checksum() {
+	local recv_sum
+	local file_sum
 
-if [[ -z "$recv_sum" || "$recv_sum" != "$file_sum" ]]; then
-	die "Checksum verification failed!"
-else
-	echo "Checksum correct."
+	log "Downloading SHA512SUMS and verifying checksum"
+	curl -L -f -# -O "$ftpmirror/SHA512SUMS" || die "Could not download SHA512SUMS."
+
+	recv_sum="$(awk -v f="$filepath" '$NF==f {print $1; exit}' SHA512SUMS)"
+	file_sum="$(sha512sum "$file" | awk '{print $1}')"
+
+	if [[ -z "$recv_sum" || "$recv_sum" != "$file_sum" ]]; then
+		die "Checksum verification failed!"
+	fi
+
+	log "Checksum correct."
 	rm -f SHA512SUMS
-fi
+}
 
-# Extract the downloaded archive
-echo "Extracting the archive, please wait..."
-[[ -d ../browser ]] && rm -rf ../browser
-case "$file" in
-	*.tar.xz)  tar xJf "$file" ;;
-	*.tar.bz2) tar xjf "$file" ;;
-	*)         tar xf  "$file"  ;;
-esac
-rm -f "$file"
-mv firefox ../browser
-mkdir -p ../browser/data
+extract_archive() {
+	log "Extracting Firefox archive"
+	[[ -d ../browser ]] && rm -rf ../browser
+	case "$file" in
+		*.tar.xz)  tar xJf "$file" ;;
+		*.tar.bz2) tar xjf "$file" ;;
+		*)         tar xf  "$file"  ;;
+	esac
+	rm -f "$file"
+	mv firefox ../browser
+	mkdir -p ../browser/data
+}
 
-# Remove unnecessary files
-echo "Removing unnecessary files..."
-rm -f ../browser/crashreporter*
-rm -f ../browser/minidump-analyzer
-rm -f ../browser/pingsender
-rm -f ../browser/precomplete
-rm -f ../browser/removed-files
-rm -f ../browser/update*
-rm -f ../browser/Throbber-small.gif
-rm -f ../browser/browser/crashreporter-override.ini
-rm -f ../browser/browser/features/formautofill@mozilla.org.xpi
-rm -f ../browser/browser/features/screenshots@mozilla.org.xpi
-rm -rf ../browser/icons
+remove_unneeded_files() {
+	local -a files_to_remove=(
+		../browser/crashreporter*
+		../browser/minidump-analyzer
+		../browser/pingsender
+		../browser/precomplete
+		../browser/removed-files
+		../browser/update*
+		../browser/Throbber-small.gif
+		../browser/browser/crashreporter-override.ini
+		../browser/browser/features/formautofill@mozilla.org.xpi
+		../browser/browser/features/screenshots@mozilla.org.xpi
+	)
 
-# Update configuration files
-echo "Updating configuration files..."
-sed -i 's/Enabled=1/Enabled=0/g' ../browser/application.ini || true
-sed -i 's/ServerURL=.*/ServerURL=-/' ../browser/application.ini || true
+	log "Removing unnecessary files"
+	rm -f "${files_to_remove[@]}"
+	rm -rf ../browser/icons
+}
 
-# Download the NoScript extension
-echo "Downloading the NoScript extension..."
-mkdir -p ../browser/browser/extensions
-curl -L -f -# -o ../browser/browser/extensions/\{73a6fe31-595d-460b-a920-fcc0f8843232\}.xpi \
-	"https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
+update_configs() {
+	log "Updating configuration files"
+	sed -i 's/Enabled=1/Enabled=0/g' ../browser/application.ini || true
+	sed -i 's/ServerURL=.*/ServerURL=-/' ../browser/application.ini || true
+}
 
-# Add standard configuration files
-echo "Adding standard configs..."
-cp -r preferences/* ../browser/
-cp -r profile/* ../browser/data/
+download_noscript() {
+	log "Downloading the NoScript extension"
+	mkdir -p ../browser/browser/extensions
+	curl -L -f -# -o ../browser/browser/extensions/\{73a6fe31-595d-460b-a920-fcc0f8843232\}.xpi \
+		"https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
+}
 
-# Copy desktop launch scripts
-echo "Copying desktop launch scripts..."
-cp -r scripts/* ../browser/
-cp scripts/start-i2pd-browser.desktop ../
+copy_standard_configs() {
+	log "Adding standard configs"
+	cp -r preferences/* ../browser/
+	cp -r profile/* ../browser/data/
+}
 
-echo "Finished!"
+format_distribution_policy_json() {
+	local json_file="preferences/distribution/policies.json"
+	local tmp_json_file="${json_file}.tmp"
+
+	log "Formatting distribution policy JSON with jq"
+	jq . "$json_file" > "$tmp_json_file"
+	cat "$tmp_json_file" > "$json_file"
+	rm -f "$tmp_json_file"
+}
+
+copy_launch_scripts() {
+	log "Copying desktop launch scripts"
+	cp -r scripts/* ../browser/
+	cp scripts/start-i2pd-browser.desktop ../
+}
+
+main() {
+	setup_workdir
+	check_tools
+	detect_arch
+	resolve_latest_firefox
+	download_firefox
+	verify_checksum
+	extract_archive
+	remove_unneeded_files
+	update_configs
+	download_noscript
+	format_distribution_policy_json
+	copy_standard_configs
+	copy_launch_scripts
+	log "Build completed"
+}
+
+main "$@"
