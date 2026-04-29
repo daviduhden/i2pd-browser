@@ -38,10 +38,11 @@ jobs:
           set -Eeuo pipefail
 
           conf_file="i2pd/i2pd.conf"
-          datadir="${RUNNER_TEMP}/i2pd-data"
+          datadir="${GITHUB_WORKSPACE}/.tmp-i2pd-data"
           tmp_hosts_dir="${RUNNER_TEMP}/hosts"
 
           mkdir -p "${datadir}" "${tmp_hosts_dir}"
+          chmod 0777 "${datadir}"
 
           cleanup() {
             if [[ -f "${datadir}/i2pd.pid" ]]; then
