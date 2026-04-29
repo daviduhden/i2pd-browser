@@ -38,29 +38,47 @@ jobs:
           set -Eeuo pipefail
 
           conf_file="i2pd/i2pd.conf"
-          datadir="${GITHUB_WORKSPACE}/.tmp-i2pd-data"
+          datadir="${RUNNER_TEMP}/i2pd-data"
+          pidfile="${datadir}/i2pd.pid"
           tmp_hosts_dir="${RUNNER_TEMP}/hosts"
 
-          mkdir -p "${datadir}" "${tmp_hosts_dir}"
-          chmod 0777 "${datadir}"
+          mkdir -p "${datadir}/destinations" "${tmp_hosts_dir}"
+          chmod -R u+rwX "${datadir}"
 
           cleanup() {
-            if [[ -f "${datadir}/i2pd.pid" ]]; then
-              kill "$(cat "${datadir}/i2pd.pid")" || true
+            if [[ -f "${pidfile}" ]]; then
+              kill "$(cat "${pidfile}")" || true
             fi
           }
           trap cleanup EXIT
 
-          i2pd --conf="${conf_file}" --datadir="${datadir}" --daemon
+          i2pd \
+            --conf="${conf_file}" \
+            --datadir="${datadir}" \
+            --pidfile="${pidfile}" \
+            >"${RUNNER_TEMP}/i2pd.log" 2>&1 &
 
+          proxy_ready=0
           for _ in {1..45}; do
             if curl --silent --show-error --fail --max-time 5 \
               --proxy "http://127.0.0.1:4444" \
               "http://i2p-projekt.i2p/hosts.txt" >/dev/null 2>&1; then
+              proxy_ready=1
               break
+            fi
+            if [[ -f "${pidfile}" ]] && ! kill -0 "$(cat "${pidfile}")" 2>/dev/null; then
+              echo "i2pd exited before proxy became ready" >&2
+              tail -n 200 "${RUNNER_TEMP}/i2pd.log" >&2 || true
+              exit 1
             fi
             sleep 10
           done
+
+          if [[ "${proxy_ready}" -ne 1 ]]; then
+            echo "i2pd proxy did not become ready in time" >&2
+            tail -n 200 "${RUNNER_TEMP}/i2pd.log" >&2 || true
+            exit 1
+          fi
 
           python3 - <<'PY'
           import os
