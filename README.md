@@ -8,6 +8,7 @@ The I2Pd browser is a pre-configured version of Firefox ESR for use on the I2P n
 
 - **Auto-detecting system architecture**: The script automatically detects the system architecture to configure Firefox accordingly.
 - **Pre-configuring Firefox**: Firefox is pre-configured for use with I2Pd, including necessary settings adjustments.
+- **Aggressive hardening profile**: Non-essential browser capabilities are disabled by default to minimize attack surface on Firefox ESR.
 - **NoScript extension**: The script downloads and installs the NoScript extension for added security.
 - **Checksum verification**: Ensures the integrity of the downloaded Firefox package.
 - **Environment preservation**: Maintains the environment variables and arguments when executing the `start-i2pd-browser` script, ensuring consistent configuration and behavior.
