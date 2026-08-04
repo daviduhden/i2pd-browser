@@ -1,11 +1,14 @@
 #!/bin/bash
 
-# See the LICENSE file at the top of the project tree for copyright and license details.
+# See the LICENSE file at the top of the project tree for
+# copyright and license details.
 #
-# This script automates the process of preparing Firefox ESR for its use with I2Pd.
-# It discovers the latest Firefox ESR, downloads it, verifies its integrity,
-# extracts it, removes unnecessary files, updates configuration settings and extensions,
-# and finally copies necessary scripts and configurations for the I2Pd Browser.
+# This script automates the process of preparing Firefox ESR
+# for its use with I2Pd. It discovers the latest Firefox ESR,
+# downloads it, verifies its integrity, extracts it, removes
+# unnecessary files, updates configuration settings and
+# extensions, and finally copies necessary scripts and
+# configurations for the I2Pd Browser.
 
 set -Eeuo pipefail
 
@@ -24,12 +27,27 @@ else
 	RESET=""
 fi
 
-log() { printf '%s %b[INFO]%b ✅ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$GREEN" "$RESET" "$*"; }
-warn() { printf '%s %b[WARN]%b ⚠️ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$YELLOW" "$RESET" "$*"; }
-error() { printf '%s %b[ERROR]%b ❌ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$RED" "$RESET" "$*" >&2; }
+log() {
+	printf '%s %b[INFO]%b %s\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S')" \
+		"$GREEN" "$RESET" "$*"
+}
+warn() {
+	printf '%s %b[WARN]%b %s\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S')" \
+		"$YELLOW" "$RESET" "$*"
+}
+error() {
+	printf '%s %b[ERROR]%b %s\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S')" \
+		"$RED" "$RESET" "$*" >&2
+}
 
 die() { error "$*"; exit 1; }
-need() { command -v "$1" >/dev/null 2>&1 || die "'$1' is required but not installed."; }
+need() {
+	command -v "$1" >/dev/null 2>&1 \
+		|| die "'$1' is required but not installed."
+}
 
 readonly -a REQUIRED_TOOLS=(
 	curl
@@ -54,8 +72,10 @@ ftpmirror=""
 filepath=""
 
 setup_workdir() {
-	dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)"
-	cd "$dir" || die "Could not access the script directory: $dir"
+	dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" \
+		&>/dev/null && pwd -P)"
+	cd "$dir" \
+		|| die "Could not access the script directory: $dir"
 }
 
 check_tools() {
@@ -91,15 +111,22 @@ detect_arch() {
 }
 
 resolve_latest_firefox() {
-	log "Resolving latest Firefox ESR for $fx_os ($arch), language: $language"
-	final_url="$(curl -s -L -I -o /dev/null -w '%{url_effective}' \
-		"https://download.mozilla.org/?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")" || die "Failed to query the redirector."
+	log "Resolving latest Firefox ESR for" \
+		"$fx_os ($arch), language: $language"
+	final_url="$(curl -s -L -I -o /dev/null \
+		-w '%{url_effective}' \
+		"https://download.mozilla.org/\
+?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")" \
+		|| die "Failed to query the redirector."
 
-	[[ -n "$final_url" ]] || die "Could not resolve the Firefox download URL via the redirector."
+	[[ -n "$final_url" ]] \
+		|| die "Could not resolve the Firefox download" \
+		"URL via the redirector."
 
 	file="$(basename "$final_url")"
 
-	if [[ "$file" =~ ^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$ ]]; then
+	if [[ "$file" =~ ^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$ ]]
+	then
 		version="${BASH_REMATCH[1]}"
 	else
 		die "Could not parse the version from filename: $file"
@@ -113,8 +140,11 @@ resolve_latest_firefox() {
 
 download_firefox() {
 	log "Downloading Firefox $version"
-	curl -L -f -# -O "$final_url" || die "Could not download the file. Check your internet connection."
-	[[ -f "$file" ]] || die "Downloaded file not found: $file"
+	curl -L -f -# -O "$final_url" \
+		|| die "Could not download the file." \
+		"Check your internet connection."
+	[[ -f "$file" ]] \
+		|| die "Downloaded file not found: $file"
 }
 
 verify_checksum() {
@@ -122,9 +152,11 @@ verify_checksum() {
 	local file_sum
 
 	log "Downloading SHA512SUMS and verifying checksum"
-	curl -L -f -# -O "$ftpmirror/SHA512SUMS" || die "Could not download SHA512SUMS."
+	curl -L -f -# -O "$ftpmirror/SHA512SUMS" \
+		|| die "Could not download SHA512SUMS."
 
-	recv_sum="$(awk -v f="$filepath" '$NF==f {print $1; exit}' SHA512SUMS)"
+	recv_sum="$(awk -v f="$filepath" \
+		'$NF==f {print $1; exit}' SHA512SUMS)"
 	file_sum="$(sha512sum "$file" | awk '{print $1}')"
 
 	if [[ -z "$recv_sum" || "$recv_sum" != "$file_sum" ]]; then
@@ -158,8 +190,10 @@ remove_unneeded_files() {
 		../browser/update*
 		../browser/Throbber-small.gif
 		../browser/browser/crashreporter-override.ini
-		../browser/browser/features/formautofill@mozilla.org.xpi
-		../browser/browser/features/screenshots@mozilla.org.xpi
+		../browser/browser/features/\
+formautofill@mozilla.org.xpi
+		../browser/browser/features/\
+screenshots@mozilla.org.xpi
 	)
 
 	log "Removing unnecessary files"
@@ -169,15 +203,20 @@ remove_unneeded_files() {
 
 update_configs() {
 	log "Updating configuration files"
-	sed -i 's/Enabled=1/Enabled=0/g' ../browser/application.ini || true
-	sed -i 's/ServerURL=.*/ServerURL=-/' ../browser/application.ini || true
+	sed -i 's/Enabled=1/Enabled=0/g' \
+		../browser/application.ini || true
+	sed -i 's/ServerURL=.*/ServerURL=-/' \
+		../browser/application.ini || true
 }
 
 download_noscript() {
 	log "Downloading the NoScript extension"
 	mkdir -p ../browser/browser/extensions
-	curl -L -f -# -o ../browser/browser/extensions/\{73a6fe31-595d-460b-a920-fcc0f8843232\}.xpi \
-		"https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
+	curl -L -f -# \
+		-o ../browser/browser/extensions/\
+\{73a6fe31-595d-460b-a920-fcc0f8843232\}.xpi \
+		"https://addons.mozilla.org/firefox/\
+downloads/latest/noscript/latest.xpi"
 }
 
 copy_standard_configs() {
