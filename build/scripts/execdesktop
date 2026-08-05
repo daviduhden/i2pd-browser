@@ -1,28 +1,29 @@
 #!/bin/bash
 
-# See the LICENSE file at the top of the project tree for copyright and license details.
+# See the LICENSE file at the top of the project tree for copyright
+# and license details.
 
-# This script extracts the I2Pd Browser startup program from the given file
-# The program is specified in the line that starts with 'X-I2PdBrowser-ExecShell'
-# The line is processed to remove the prefix and any trailing characters
+# This script extracts the I2Pd Browser startup program from the
+# given file. The program is specified in the line that starts with
+# 'X-I2PdBrowser-ExecShell'. The line is processed to remove the
+# prefix and any trailing characters.
 
 set -Eeuo pipefail
 
-if [[ -t 1 && "${NO_COLOR:-0}" != "1" ]]; then
-	GREEN="\033[32m"
-	YELLOW="\033[33m"
-	RED="\033[31m"
-	RESET="\033[0m"
-else
-	GREEN=""
-	YELLOW=""
-	RED=""
-	RESET=""
-fi
+log() {
+    printf '%s [INFO] %s\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
 
-log() { printf '%s %b[INFO]%b ✅ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$GREEN" "$RESET" "$*"; }
-warn() { printf '%s %b[WARN]%b ⚠️ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$YELLOW" "$RESET" "$*"; }
-error() { printf '%s %b[ERROR]%b ❌ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$RED" "$RESET" "$*" >&2; }
+warn() {
+    printf '%s [WARN] %s\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
+
+error() {
+    printf '%s [ERROR] %s\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2
+}
 
 trap 'error "Unhandled error at line $LINENO."' ERR
 
@@ -31,54 +32,55 @@ I2PDB_START_PROG=""
 passthrough_args=()
 
 usage() {
-	log "Usage: $0 <desktop-file> [args...]"
+    log "Usage: $0 <desktop-file> [args...]"
 }
 
 parse_args() {
-	if [[ $# -lt 1 ]]; then
-		usage
-		exit 1
-	fi
+    if [[ $# -lt 1 ]]; then
+        usage
+        exit 1
+    fi
 
-	desktop_file="$1"
-	shift
-	passthrough_args=("$@")
+    desktop_file="$1"
+    shift
+    passthrough_args=("$@")
 }
 
 extract_command() {
-	local line
-	local extracted=""
+    local line
+    local extracted
 
-	while IFS= read -r line; do
-		[[ "$line" == X-I2PdBrowser-ExecShell=* ]] || continue
-		extracted="${line#X-I2PdBrowser-ExecShell=}"
-	done < "$desktop_file"
+    extracted=""
+    while IFS= read -r line; do
+        [[ "$line" == X-I2PdBrowser-ExecShell=* ]] || continue
+        extracted="${line#X-I2PdBrowser-ExecShell=}"
+    done < "$desktop_file"
 
-	[[ -n "$extracted" ]] || {
-		error "X-I2PdBrowser-ExecShell not found in $desktop_file"
-		exit 1
-	}
+    [[ -n "$extracted" ]] || {
+        error "X-I2PdBrowser-ExecShell not found in $desktop_file"
+        exit 1
+    }
 
-	I2PDB_START_PROG="${extracted//%?}"
+    I2PDB_START_PROG="${extracted//%?}"
 }
 
 announce_launch() {
-	if [[ "$#" -ge 1 ]]; then
-		log "Launching: ${I2PDB_START_PROG} $*"
-	else
-		log "Launching: ${I2PDB_START_PROG}"
-	fi
+    if [[ "$#" -ge 1 ]]; then
+        log "Launching: ${I2PDB_START_PROG} $*"
+    else
+        log "Launching: ${I2PDB_START_PROG}"
+    fi
 }
 
 run_start_program() {
-	${I2PDB_START_PROG} "$@"
+    ${I2PDB_START_PROG} "$@"
 }
 
 main() {
-	parse_args "$@"
-	extract_command
-	announce_launch "${passthrough_args[@]}"
-	run_start_program "${passthrough_args[@]}"
+    parse_args "$@"
+    extract_command
+    announce_launch "${passthrough_args[@]}"
+    run_start_program "${passthrough_args[@]}"
 }
 
 main "$@"
