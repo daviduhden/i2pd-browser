@@ -1,118 +1,122 @@
 #!/bin/bash
 
-# See the LICENSE file at the top of the project tree for copyright and license details.
+# See the LICENSE file at the top of the project tree for copyright
+# and license details.
 
-# This script checks if the I2Pd daemon is installed and running on the system.
-# If I2Pd is not found in standard locations, it questions the user to install it.
-# The script also verifies the system architecture and the presence of 'screen',
-# and then starts I2Pd in a detached screen session if all conditions are met.
+# This script checks if the I2Pd daemon is installed and running on
+# the system. If I2Pd is not found in standard locations, it errors
+# out. The script also verifies the system architecture and the
+# presence of 'screen', and then starts I2Pd in a detached screen
+# session if all conditions are met.
 
 set -Eeuo pipefail
 
-# Simple colors for messages
-if [[ -t 1 && "${NO_COLOR:-0}" != "1" ]]; then
-	GREEN="\033[32m"
-	YELLOW="\033[33m"
-	RED="\033[31m"
-	RESET="\033[0m"
-else
-	GREEN=""
-	YELLOW=""
-	RED=""
-	RESET=""
-fi
+log() {
+    printf '%s [INFO] %s\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
 
-log() { printf '%s %b[INFO]%b ✅ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$GREEN" "$RESET" "$*"; }
-warn() { printf '%s %b[WARN]%b ⚠️ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$YELLOW" "$RESET" "$*"; }
-error() { printf '%s %b[ERROR]%b ❌ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$RED" "$RESET" "$*" >&2; }
+warn() {
+    printf '%s [WARN] %s\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
+
+error() {
+    printf '%s [ERROR] %s\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2
+}
 
 i2pd_path=""
 arch=""
 
 find_i2pd_path() {
-	local -a possible_locations=(
-		"/usr/sbin/i2pd"
-		"/usr/local/sbin/i2pd"
-		"/usr/bin/i2pd"
-		"/usr/local/bin/i2pd"
-		"/sbin/i2pd"
-		"/bin/i2pd"
-		"/home/linuxbrew/.linuxbrew/bin/i2pd"
-		"/home/linuxbrew/.linuxbrew/sbin/i2pd"
-	)
-	local location
-	local brew_prefix
+    local -a possible_locations
+    possible_locations=(
+        "/usr/sbin/i2pd"
+        "/usr/local/sbin/i2pd"
+        "/usr/bin/i2pd"
+        "/usr/local/bin/i2pd"
+        "/sbin/i2pd"
+        "/bin/i2pd"
+        "/home/linuxbrew/.linuxbrew/bin/i2pd"
+        "/home/linuxbrew/.linuxbrew/sbin/i2pd"
+    )
+    local location
+    local brew_prefix
 
-	if command -v i2pd >/dev/null 2>&1; then
-		i2pd_path="$(command -v i2pd)"
-		return 0
-	fi
+    if command -v i2pd >/dev/null 2>&1; then
+        i2pd_path="$(command -v i2pd)"
+        return 0
+    fi
 
-	if command -v brew >/dev/null 2>&1; then
-		brew_prefix="$(brew --prefix 2>/dev/null || true)"
-		if [[ -n "$brew_prefix" ]]; then
-			possible_locations+=(
-				"$brew_prefix/bin/i2pd"
-				"$brew_prefix/sbin/i2pd"
-			)
-		fi
-	fi
+    if command -v brew >/dev/null 2>&1; then
+        brew_prefix="$(brew --prefix 2>/dev/null || true)"
+        if [[ -n "$brew_prefix" ]]; then
+            possible_locations+=(
+                "$brew_prefix/bin/i2pd"
+                "$brew_prefix/sbin/i2pd"
+            )
+        fi
+    fi
 
-	for location in "${possible_locations[@]}"; do
-		if [[ -x "$location" ]]; then
-			i2pd_path="$location"
-			return 0
-		fi
-	done
+    for location in "${possible_locations[@]}"; do
+        if [[ -x "$location" ]]; then
+            i2pd_path="$location"
+            return 0
+        fi
+    done
 
-	return 1
+    return 1
 }
 
 check_i2pd_running() {
-	if pgrep -x "i2pd" >/dev/null; then
-		log "i2pd is installed and already running"
-	else
-		warn "i2pd is installed but not running; starting it now"
-	fi
+    if pgrep -x "i2pd" >/dev/null; then
+        log "i2pd is installed and already running"
+    else
+        warn "i2pd is installed but not running; starting it now"
+    fi
 }
 
 check_prereqs() {
-	if ! find_i2pd_path; then
-		error "i2pd not found in standard or Homebrew locations"
-		error "Install guide: https://i2pd.readthedocs.io/en/latest/user-guide/install/#linux"
-		exit 1
-	fi
+    if ! find_i2pd_path; then
+        error "i2pd not found in standard or Homebrew locations"
+        local guide_url
+        guide_url="https://i2pd.readthedocs.io"
+        guide_url+="/en/latest/user-guide/install/#linux"
+        error "Install guide: $guide_url"
+        exit 1
+    fi
 
-	if ! command -v screen >/dev/null 2>&1; then
-		error "Required command 'screen' not found"
-		exit 1
-	fi
+    if ! command -v screen >/dev/null 2>&1; then
+        error "Required command 'screen' not found"
+        exit 1
+    fi
 }
 
 check_arch() {
-	arch="$(uname -m)"
+    arch="$(uname -m)"
 
-	case "$arch" in
-		x86_64|amd64|i686|i386|arm64|aarch64)
-			return 0
-			;;
-		*)
-			error "Unsupported system architecture: $arch"
-			exit 1
-			;;
-	esac
+    case "$arch" in
+        x86_64|amd64|i686|i386|arm64|aarch64)
+            return 0
+            ;;
+        *)
+            error "Unsupported system architecture: $arch"
+            exit 1
+            ;;
+    esac
 }
 
 start_i2pd() {
-	log "Starting i2pd with binary: $i2pd_path"
-	screen -Adm -S i2pd "$i2pd_path" --datadir=.
+    log "Starting i2pd with binary: $i2pd_path"
+    screen -Adm -S i2pd "$i2pd_path" --datadir=.
 }
 
 main() {
-	check_prereqs
-	check_i2pd_running
-	check_arch
-	start_i2pd
+    check_prereqs
+    check_i2pd_running
+    check_arch
+    start_i2pd
 }
 
 main "$@"
