@@ -1,0 +1,4 @@
+http://i2p-projekt.i2p/hosts.txt
+http://skank.i2p/hosts.txt
+http://identiguy.i2p/hosts.txt
+http://stats.i2p/cgi-bin/newhosts.txt

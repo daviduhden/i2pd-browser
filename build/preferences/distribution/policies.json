@@ -4,10 +4,30 @@
     "DisableSystemAddonUpdate": true,
     "DisableTelemetry": true,
     "DisableFirefoxStudies": true,
+    "DisableRemoteImprovements": true,
     "DisableFirefoxAccounts": true,
-    "DisableFirefoxView": true,
-    "DisablePocket": true,
     "DisableFeedbackCommands": true,
+    "BrowserDataBackup": {
+      "AllowBackup": false,
+      "AllowRestore": false
+    },
+    "AIControls": {
+      "Default": {
+        "Value": "blocked",
+        "Locked": true
+      }
+    },
+    "DefaultSerialGuardSetting": 2,
+    "IPProtectionAvailable": false,
+    "LocalNetworkAccess": {
+      "Enabled": true,
+      "BlockTrackers": true,
+      "EnablePrompting": true,
+      "Locked": true
+    },
+    "VisualSearchEnabled": false,
+    "XSLTEnabled": false,
+    "HttpsOnlyMode": "disallowed",
     "DNSOverHTTPS": {
       "Enabled": false,
       "Locked": true
@@ -19,10 +39,11 @@
     "OverridePostUpdatePage": "",
     "Proxy": {
       "Mode": "manual",
+      "Locked": true,
       "HTTPProxy": "127.0.0.1:4444",
       "SSLProxy": "127.0.0.1:4444",
-      "FTPProxy": "127.0.0.1:4444",
-      "UseProxyForDNS": true
+      "UseProxyForDNS": true,
+      "Passthrough": ""
     },
     "SearchEngines": {
       "Default": "YaCy",
@@ -47,12 +68,12 @@
     "SearchSuggestEnabled": false,
     "FirefoxHome": {
       "Search": true,
+      "Weather": false,
       "TopSites": false,
       "Highlights": false,
       "Pocket": false,
       "Snippets": false,
-      "SponsoredTopSites": false,
-      "FirefoxView": false
+      "SponsoredTopSites": false
     },
     "SupportMenu": {
       "Title": "ILITA IRC",
@@ -68,14 +89,6 @@
       "Location": {
         "BlockNewRequests": true
       }
-    },
-    "Preferences": {
-      "browser.ml.chat.enabled": false,
-      "browser.ml.chat.menu": false,
-      "browser.ml.chat.sidebar": false,
-      "browser.ml.chat.page": false,
-      "browser.ml.chat.shortcuts": false,
-      "sidebar.notification.badge.aichat": false
     }
   }
 }

@@ -84,6 +84,7 @@ logfile=/dev/null
 myname=""
 mydir=""
 browser_args=()
+browser_launcher=()
 
 check_runtime() {
     local cpu_arch
@@ -246,9 +247,36 @@ handle_app_registration() {
     fi
 }
 
+# Detect the secureblue operating system, which loads hardened_malloc
+# via /etc/ld.so.preload and provides the with-standard-malloc helper.
+is_secureblue() {
+    local os_release
+
+    os_release=/etc/os-release
+    [[ -r "$os_release" ]] || os_release=/usr/lib/os-release
+    [[ -r "$os_release" ]] || return 1
+    grep -q '^ID=secureblue$' "$os_release"
+}
+
 prepare_browser_env() {
     export HOME="$PWD"
-    unset LD_PRELOAD || true
+
+    # On secureblue, unsetting LD_PRELOAD is not enough because
+    # hardened_malloc is loaded through /etc/ld.so.preload. Use the
+    # provided helper so only the browser runs with the standard
+    # allocator, keeping the rest of the session hardened.
+    if is_secureblue; then
+        if command -v with-standard-malloc >/dev/null 2>&1; then
+            browser_launcher=(with-standard-malloc)
+        else
+            warn "with-standard-malloc not found;" \
+                " falling back to unsetting LD_PRELOAD."
+            unset LD_PRELOAD || true
+        fi
+    else
+        unset LD_PRELOAD || true
+    fi
+
     export GSETTINGS_BACKEND=memory
     cd "$HOME" || exit 1
 }
@@ -257,14 +285,14 @@ run_browser() {
     local rc
 
     if [[ "$show_usage" -eq 1 ]]; then
-        ./firefox --class "I2Pd Browser" \
+        "${browser_launcher[@]}" ./firefox --class "I2Pd Browser" \
             -profile data --help 2>/dev/null
         browser_usage
         return 0
     fi
 
     if [[ "$detach" -eq 1 ]]; then
-        ./firefox --class "I2Pd Browser" \
+        "${browser_launcher[@]}" ./firefox --class "I2Pd Browser" \
             -profile data "$@" \
             >"$logfile" 2>&1 </dev/null &
         disown "$!"
@@ -272,7 +300,7 @@ run_browser() {
     fi
 
     if [[ "$log_output" -eq 1 && "$show_output" -eq 1 ]]; then
-        ./firefox --class "I2Pd Browser" \
+        "${browser_launcher[@]}" ./firefox --class "I2Pd Browser" \
             -profile data "$@" 2>&1 </dev/null \
             | tee "$logfile"
         rc=$?
@@ -280,13 +308,13 @@ run_browser() {
     fi
 
     if [[ "$show_output" -eq 1 ]]; then
-        ./firefox --class "I2Pd Browser" \
+        "${browser_launcher[@]}" ./firefox --class "I2Pd Browser" \
             -profile data "$@" </dev/null
         rc=$?
         return "$rc"
     fi
 
-    ./firefox --class "I2Pd Browser" \
+    "${browser_launcher[@]}" ./firefox --class "I2Pd Browser" \
         -profile data "$@" \
         >"$logfile" 2>&1 </dev/null
 }

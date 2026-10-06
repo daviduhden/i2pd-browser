@@ -2,121 +2,20 @@
 
 # See the LICENSE file at the top of the project tree for copyright
 # and license details.
-
-# This script checks if the I2Pd daemon is installed and running on
-# the system. If I2Pd is not found in standard locations, it errors
-# out. The script also verifies the system architecture and the
-# presence of 'screen', and then starts I2Pd in a detached screen
-# session if all conditions are met.
+#
+# Launcher for the i2pd (C++) I2P router backend. Kept as a thin
+# wrapper around the shared router abstraction so the original
+# behaviour of this file is preserved.
 
 set -Eeuo pipefail
 
-log() {
-    printf '%s [INFO] %s\n' \
-        "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
-}
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" \
+    && pwd -P)"
 
-warn() {
-    printf '%s [WARN] %s\n' \
-        "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
-}
+# shellcheck source=../lib/router.bash
+# shellcheck disable=SC1091
+source "$_script_dir/../lib/router.bash"
 
-error() {
-    printf '%s [ERROR] %s\n' \
-        "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2
-}
-
-i2pd_path=""
-arch=""
-
-find_i2pd_path() {
-    local -a possible_locations
-    possible_locations=(
-        "/usr/sbin/i2pd"
-        "/usr/local/sbin/i2pd"
-        "/usr/bin/i2pd"
-        "/usr/local/bin/i2pd"
-        "/sbin/i2pd"
-        "/bin/i2pd"
-        "/home/linuxbrew/.linuxbrew/bin/i2pd"
-        "/home/linuxbrew/.linuxbrew/sbin/i2pd"
-    )
-    local location
-    local brew_prefix
-
-    if command -v i2pd >/dev/null 2>&1; then
-        i2pd_path="$(command -v i2pd)"
-        return 0
-    fi
-
-    if command -v brew >/dev/null 2>&1; then
-        brew_prefix="$(brew --prefix 2>/dev/null || true)"
-        if [[ -n "$brew_prefix" ]]; then
-            possible_locations+=(
-                "$brew_prefix/bin/i2pd"
-                "$brew_prefix/sbin/i2pd"
-            )
-        fi
-    fi
-
-    for location in "${possible_locations[@]}"; do
-        if [[ -x "$location" ]]; then
-            i2pd_path="$location"
-            return 0
-        fi
-    done
-
-    return 1
-}
-
-check_i2pd_running() {
-    if pgrep -x "i2pd" >/dev/null; then
-        log "i2pd is installed and already running"
-    else
-        warn "i2pd is installed but not running; starting it now"
-    fi
-}
-
-check_prereqs() {
-    if ! find_i2pd_path; then
-        error "i2pd not found in standard or Homebrew locations"
-        local guide_url
-        guide_url="https://i2pd.readthedocs.io"
-        guide_url+="/en/latest/user-guide/install/#linux"
-        error "Install guide: $guide_url"
-        exit 1
-    fi
-
-    if ! command -v screen >/dev/null 2>&1; then
-        error "Required command 'screen' not found"
-        exit 1
-    fi
-}
-
-check_arch() {
-    arch="$(uname -m)"
-
-    case "$arch" in
-        x86_64|amd64|i686|i386|arm64|aarch64)
-            return 0
-            ;;
-        *)
-            error "Unsupported system architecture: $arch"
-            exit 1
-            ;;
-    esac
-}
-
-start_i2pd() {
-    log "Starting i2pd with binary: $i2pd_path"
-    screen -Adm -S i2pd "$i2pd_path" --datadir=.
-}
-
-main() {
-    check_prereqs
-    check_i2pd_running
-    check_arch
-    start_i2pd
-}
-
-main "$@"
+router_load_backend i2pd
+router_prepare_config
+router_start
