@@ -4,9 +4,9 @@
 # copyright and license details.
 #
 # This script automates the process of preparing Firefox ESR
-# for its use with I2Pd. It discovers the latest Firefox ESR,
-# downloads it, verifies its integrity, extracts it, removes
-# unnecessary files, updates configuration settings and
+# for its use with I2Pd. It discovers the newest Firefox ESR
+# branch, downloads it, verifies its integrity, extracts it,
+# removes unnecessary files, updates configuration settings and
 # extensions, and finally copies necessary scripts and
 # configurations for the I2Pd Browser.
 
@@ -62,7 +62,9 @@ readonly -a REQUIRED_TOOLS=(
 dir=""
 arch=""
 language="${language:-en-US}"
-ESR_PRODUCT="${ESR_PRODUCT:-firefox-esr-latest}"
+# The newest ESR branch is published as the "next" ESR until it becomes
+# the default. Use "firefox-esr-latest" to stay on the older branch.
+ESR_PRODUCT="${ESR_PRODUCT:-firefox-esr-next-latest}"
 fx_os=""
 fx_dir=""
 final_url=""

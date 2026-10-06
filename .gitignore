@@ -1,2 +1,14 @@
 /browser
 /start-i2pd-browser.desktop
+/i2pd-browser.conf
+
+# i2pd runtime state (configuration is committed, state is not).
+/i2pd/netDb/
+/i2pd/peerProfiles/
+/i2pd/router.keys
+/i2pd/*.dat
+/i2pd/*.log
+/i2pd/addressbook/*.txt
+
+# I2P (Java) effective configuration and runtime state.
+/i2p-java/data/
