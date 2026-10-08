@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 # See the LICENSE file at the top of the project tree for copyright
 # and license details.
 #
@@ -153,7 +155,7 @@ function Get-RouterConfValue {
     if (-not (Test-Path $file)) { return '' }
     $match = Select-String -Path $file -Pattern "^$Key=(.*)$" |
         Select-Object -Last 1
-    if ($match) { return $match.Matches[0].Groups[1].Value }
+    if ($match) { return $match.Matches[0].Groups[1].Value.Trim() }
     return ''
 }
 
@@ -258,6 +260,10 @@ function Test-RouterCommand {
 }
 
 function Get-RouterOs {
+    # $IsWindows/$IsLinux/$IsMacOS only exist on PowerShell 6+ and
+    # referencing them under Set-StrictMode fails on Windows PowerShell
+    # 5.1, which is always Windows.
+    if ($PSVersionTable.PSEdition -ne 'Core') { return 'windows' }
     if ($IsWindows) { return 'windows' }
     if ($IsLinux) { return 'linux' }
     if ($IsMacOS) { return 'macos' }

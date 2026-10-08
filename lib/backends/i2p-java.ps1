@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 # See the LICENSE file at the top of the project tree for copyright
 # and license details.
 #
@@ -48,10 +50,13 @@ function Get-I2pJavaSystemHome {
         (Join-Path $env:LOCALAPPDATA 'I2P')
         (Join-Path $env:APPDATA 'I2P')
         (Join-Path $env:ProgramFiles 'i2p')
-        (Join-Path ${env:ProgramFiles(x86)} 'i2p')
         (Join-Path $env:ProgramData 'i2p')
         (Join-Path $env:USERPROFILE 'i2p')
     )
+    # ProgramFiles(x86) only exists on 64-bit Windows.
+    if (${env:ProgramFiles(x86)}) {
+        $candidates += (Join-Path ${env:ProgramFiles(x86)} 'i2p')
+    }
     if ($env:I2P_HOME) { $candidates = @($env:I2P_HOME) + $candidates }
 
     foreach ($candidate in $candidates) {
@@ -176,11 +181,11 @@ function Initialize-BackendConfig {
 
 function Get-I2pJavaLatestVersion {
     try {
-        $page = Invoke-WebRequest -Uri 'https://geti2p.net/en/download' `
+        $page = Invoke-WebRequest -Uri 'https://i2p.net/en/downloads/' `
             -UseBasicParsing
     }
     catch {
-        Write-RouterError 'Could not query https://geti2p.net/en/download'
+        Write-RouterError 'Could not query https://i2p.net/en/downloads/'
         return $null
     }
     $matches = [regex]::Matches(
@@ -194,7 +199,7 @@ function Get-I2pJavaLatestVersion {
 
 function Get-I2pJavaInstallerUrl {
     param([string]$Version)
-    return "https://files.i2p-projekt.de/$Version/i2pinstall_$Version.jar"
+    return "https://files.i2p.net/$Version/i2pinstall_$Version.jar"
 }
 
 function Install-BackendVendor {
@@ -270,14 +275,18 @@ function Start-Backend {
     New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
     Write-RouterLog "Starting I2P (Java) with: $java"
+    # Quote values that may contain spaces (for example
+    # "C:\Program Files\i2p"): Start-Process joins the argument array
+    # with spaces without adding quotes itself.
     $arguments = @(
         '-Djava.awt.headless=true'
-        "-Di2p.dir.base=$home"
-        "-Di2p.dir.config=$dataDir"
-        "-Djava.library.path=$home;$home\lib"
+        ('-Di2p.dir.base="' + $home + '"')
+        ('-Di2p.dir.config="' + $dataDir + '"')
+        ('-Djava.library.path="' + $home + ';' + $home + '\lib"')
         '-Djava.net.preferIPv4Stack=false'
         '-DloggerFilenameOverride=logs/log-router-@.txt'
-        '-cp', $classpath
+        '-cp'
+        ('"' + $classpath + '"')
         'net.i2p.router.RouterLaunch'
     )
     $process = Start-Process -FilePath $java -ArgumentList $arguments `

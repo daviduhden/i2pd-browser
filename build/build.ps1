@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 # See the LICENSE file at the top of the project tree for copyright
 # and license details.
 #
@@ -44,12 +46,26 @@ function Resolve-FirefoxDownload {
     "&os=$os&lang=$script:Language"
     Write-BuildLog "Resolving latest Firefox ESR for $os, language: $script:Language"
     try {
-        $response = Invoke-WebRequest -Uri $url -UseBasicParsing
+        # HEAD follows the redirector without downloading the installer.
+        $response = Invoke-WebRequest -Uri $url -Method Head `
+            -UseBasicParsing
     }
     catch {
-        Stop-Build 'Failed to query the redirector.'
+        Stop-Build (
+            "Failed to resolve a $script:EsrProduct build for $os; " +
+            'the platform may no longer be published.'
+        )
     }
-    $final = $response.BaseResponse.ResponseUri.AbsoluteUri
+    # ResponseUri exists on Windows PowerShell 5.1; on PowerShell 7 the
+    # final URL comes from the request message.
+    $base = $response.BaseResponse
+    $final = $null
+    if ($base.PSObject.Properties.Match('ResponseUri').Count -gt 0) {
+        $final = $base.ResponseUri.AbsoluteUri
+    }
+    elseif ($base.PSObject.Properties.Match('RequestMessage').Count -gt 0) {
+        $final = $base.RequestMessage.RequestUri.AbsoluteUri
+    }
     if (-not $final) { Stop-Build 'Could not resolve the download URL.' }
     return $final
 }
@@ -64,7 +80,7 @@ function Get-FirefoxVersion {
 function Get-ExpectedChecksum {
     param(
         [string]$ReleaseUrl,
-        [string]$FileName
+        [string]$RelativePath
     )
     try {
         $sums = Invoke-WebRequest -Uri "$ReleaseUrl/SHA512SUMS" `
@@ -74,14 +90,17 @@ function Get-ExpectedChecksum {
         Write-BuildWarn 'SHA512SUMS is not available for this platform.'
         return ''
     }
-    $pattern = '^([0-9a-fA-F]{128})\s+(.*' +
-    [regex]::Escape($FileName) + ')$'
+    # Match the full path relative to the release root. The base name
+    # alone is not unique (every platform and locale ships the same
+    # installer name).
+    $pattern = '^([0-9a-fA-F]{128})\s+' +
+    [regex]::Escape($RelativePath) + '$'
     foreach ($line in ($sums.Content -split "`n")) {
         if ($line -match $pattern) {
             return $Matches[1]
         }
     }
-    Write-BuildWarn "No checksum entry found for $FileName."
+    Write-BuildWarn "No checksum entry found for $RelativePath."
     return ''
 }
 
@@ -108,20 +127,26 @@ function Install-Firefox {
     Invoke-WebRequest -Uri $Url -OutFile $installer -UseBasicParsing
 
     # SHA512SUMS lives at the release root, not in the platform
-    # language directory that contains the installer.
+    # language directory that contains the installer. The relative
+    # path (for example "win64/en-US/Firefox Setup ... .exe") is what
+    # identifies the exact entry.
     $releaseUrl = [regex]::Match(
         $Url, '^(.*/releases/[^/]+)/'
     ).Groups[1].Value
     if (-not $releaseUrl) { $releaseUrl = ($Url -replace '/[^/]+$', '') }
+    $relative = [Uri]::UnescapeDataString(
+        $Url.Substring($releaseUrl.Length).TrimStart('/')
+    )
     $expected = Get-ExpectedChecksum -ReleaseUrl $releaseUrl `
-        -FileName $fileName
-    if ($expected) {
-        $actual = (Get-FileHash -Path $installer -Algorithm SHA512).Hash
-        if ($actual -ne $expected.ToUpperInvariant()) {
-            Stop-Build 'Checksum verification failed.'
-        }
-        Write-BuildLog 'Checksum correct.'
+        -RelativePath $relative
+    if (-not $expected) {
+        Stop-Build "No SHA512 checksum was found for $relative."
     }
+    $actual = (Get-FileHash -Path $installer -Algorithm SHA512).Hash
+    if ($actual -ne $expected.ToUpperInvariant()) {
+        Stop-Build 'Checksum verification failed.'
+    }
+    Write-BuildLog 'Checksum correct.'
 
     Write-BuildLog 'Installing Firefox'
     $process = Start-Process -FilePath $installer -Wait -PassThru `
@@ -171,7 +196,7 @@ function Update-Configs {
         (Get-Content $ini) `
             -replace 'Enabled=1', 'Enabled=0' `
             -replace 'ServerURL=.*', 'ServerURL=-' |
-            Set-Content $ini
+            Set-Content $ini -Encoding ascii
     }
 }
 
@@ -192,7 +217,11 @@ function Format-PoliciesJson {
     $policies = Join-Path $script:BrowserDir 'distribution\policies.json'
     Write-BuildLog 'Formatting distribution policy JSON'
     $data = Get-Content $policies -Raw | ConvertFrom-Json
-    $data | ConvertTo-Json -Depth 100 | Set-Content $policies -Encoding utf8
+    $json = $data | ConvertTo-Json -Depth 100
+    # Write UTF-8 without a BOM: Windows PowerShell 5.1 adds one with
+    # Set-Content -Encoding utf8.
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($policies, $json, $utf8)
 }
 
 function Copy-StandardConfigs {
@@ -228,3 +257,4 @@ function Main {
 . (Join-Path $script:RepoRoot 'lib/router.ps1')
 
 Main
+exit 0

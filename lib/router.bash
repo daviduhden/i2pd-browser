@@ -127,7 +127,7 @@ router_conf_get() {
 	if [[ -r $file ]]; then
 		sed -n \
 			's/^[[:space:]]*I2P_ROUTER[[:space:]]*=[[:space:]]*//p' \
-			"$file" | tail -n 1
+			"$file" | tr -d '\r' | tail -n 1
 	fi
 }
 
@@ -138,7 +138,7 @@ router_conf_get_source() {
 	if [[ -r $file ]]; then
 		sed -n \
 			's/^[[:space:]]*I2P_ROUTER_SOURCE[[:space:]]*=[[:space:]]*//p' \
-			"$file" | tail -n 1
+			"$file" | tr -d '\r' | tail -n 1
 	fi
 }
 
@@ -601,27 +601,53 @@ router_wait_for_proxy() {
 # Dependency installation helpers
 # ------------------------------------------------------------------
 
+# Preferred package manager. Homebrew is preferred on Linux when
+# available; otherwise the distribution package manager is used.
+router_package_manager() {
+	if router_have brew; then
+		printf 'brew\n'
+	elif router_have apt-get; then
+		printf 'apt\n'
+	elif router_have dnf; then
+		printf 'dnf\n'
+	elif router_have pacman; then
+		printf 'pacman\n'
+	elif router_have zypper; then
+		printf 'zypper\n'
+	fi
+}
+
 router_install_packages() {
 	(($#)) || return 0
 
-	local -a sudo_cmd=()
-	if ((EUID != 0)); then
-		sudo_cmd=(sudo)
-	fi
-
-	if command -v apt-get >/dev/null 2>&1; then
-		"${sudo_cmd[@]}" apt-get update
-		"${sudo_cmd[@]}" apt-get install -y "$@"
-	elif command -v dnf >/dev/null 2>&1; then
-		"${sudo_cmd[@]}" dnf install -y "$@"
-	elif command -v pacman >/dev/null 2>&1; then
-		"${sudo_cmd[@]}" pacman -S --noconfirm "$@"
-	elif command -v zypper >/dev/null 2>&1; then
-		"${sudo_cmd[@]}" zypper install -y "$@"
-	elif command -v brew >/dev/null 2>&1; then
-		brew install "$@"
-	else
+	local manager
+	manager="$(router_package_manager)"
+	if [[ -z $manager ]]; then
 		router_warn "No supported package manager was found."
 		return 1
 	fi
+
+	local -a sudo_cmd=()
+	if ((EUID != 0)) && [[ $manager != brew ]]; then
+		sudo_cmd=(sudo)
+	fi
+
+	case "$manager" in
+	brew)
+		brew install "$@"
+		;;
+	apt)
+		"${sudo_cmd[@]}" apt-get update
+		"${sudo_cmd[@]}" apt-get install -y "$@"
+		;;
+	dnf)
+		"${sudo_cmd[@]}" dnf install -y "$@"
+		;;
+	pacman)
+		"${sudo_cmd[@]}" pacman -S --noconfirm "$@"
+		;;
+	zypper)
+		"${sudo_cmd[@]}" zypper install -y "$@"
+		;;
+	esac
 }

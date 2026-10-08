@@ -199,7 +199,7 @@ EOF
 }
 
 backend_install_dependencies() {
-	router_install_packages i2pd
+	router_install_packages i2pd screen
 }
 
 backend_is_installed() {

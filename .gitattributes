@@ -1,0 +1,4 @@
+# Windows command scripts must keep CRLF line endings so the Command
+# Prompt parses them reliably.
+*.cmd text eol=crlf
+*.bat text eol=crlf

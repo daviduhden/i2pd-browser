@@ -148,7 +148,7 @@ i2p_java_find_java() {
 # Official I2P (Java) download page. The latest stable release and its
 # installer links are resolved from here.
 i2p_java_download_page() {
-	printf 'https://geti2p.net/en/download\n'
+	printf 'https://i2p.net/en/downloads/\n'
 }
 
 i2p_java_latest_version() {
@@ -166,7 +166,7 @@ i2p_java_latest_version() {
 	printf '%s\n' "$html" |
 		grep -oE 'i2pinstall_[0-9]+\.[0-9]+\.[0-9]+\.jar' |
 		sed 's/^i2pinstall_//; s/\.jar$//' |
-		sort -V | tail -n 1
+		sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1
 }
 
 i2p_java_installer_url() {
@@ -176,10 +176,10 @@ i2p_java_installer_url() {
 	html="$(curl -fsSL "$(i2p_java_download_page)" 2>/dev/null ||
 		true)"
 	href="$(printf '%s\n' "$html" |
-		grep -oE "https?://[^\"']*i2pinstall_${version}\.jar" |
+		grep -oE "https?://[^\"']*i2pinstall_${version//./\\.}\.jar" |
 		head -n 1)"
 	if [[ -z $href ]]; then
-		href="https://files.i2p-projekt.de/${version}"
+		href="https://files.i2p.net/${version}"
 		href+="/i2pinstall_${version}.jar"
 	fi
 	printf '%s\n' "$href"
@@ -248,18 +248,30 @@ EOF
 }
 
 backend_install_dependencies() {
-	if command -v apt-get >/dev/null 2>&1; then
-		router_install_packages i2p default-jre-headless
-	elif command -v dnf >/dev/null 2>&1; then
-		router_install_packages i2p java-17-openjdk-headless
-	elif command -v pacman >/dev/null 2>&1; then
-		router_install_packages i2p jre-openjdk-headless
-	elif command -v zypper >/dev/null 2>&1; then
-		router_install_packages i2p java-17-openjdk-headless
-	else
+	local manager
+
+	manager="$(router_package_manager)"
+	case "$manager" in
+	brew)
+		router_install_packages i2p openjdk screen
+		;;
+	apt)
+		router_install_packages i2p default-jre-headless screen
+		;;
+	dnf)
+		router_install_packages i2p java-17-openjdk-headless screen
+		;;
+	pacman)
+		router_install_packages i2p jre-openjdk-headless screen
+		;;
+	zypper)
+		router_install_packages i2p java-17-openjdk-headless screen
+		;;
+	*)
 		router_warn "No supported package manager was found."
 		return 1
-	fi
+		;;
+	esac
 }
 
 backend_is_installed() {
