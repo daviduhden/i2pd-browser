@@ -15,7 +15,7 @@ set -Eeuo pipefail
 trap 'error "Unhandled error at line $LINENO."' ERR
 
 # Helper functions
-if [[ -t 1 && "${NO_COLOR:-0}" != "1" ]]; then
+if [[ -t 1 && ${NO_COLOR:-0} != "1" ]]; then
 	GREEN="\033[32m"
 	YELLOW="\033[33m"
 	RED="\033[31m"
@@ -43,10 +43,13 @@ error() {
 		"$RED" "$RESET" "$*" >&2
 }
 
-die() { error "$*"; exit 1; }
+die() {
+	error "$*"
+	exit 1
+}
 need() {
-	command -v "$1" >/dev/null 2>&1 \
-		|| die "'$1' is required but not installed."
+	command -v "$1" >/dev/null 2>&1 ||
+		die "'$1' is required but not installed."
 }
 
 readonly -a REQUIRED_TOOLS=(
@@ -76,8 +79,8 @@ filepath=""
 setup_workdir() {
 	dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" \
 		&>/dev/null && pwd -P)"
-	cd "$dir" \
-		|| die "Could not access the script directory: $dir"
+	cd "$dir" ||
+		die "Could not access the script directory: $dir"
 }
 
 check_tools() {
@@ -91,24 +94,24 @@ detect_arch() {
 	arch="$(uname -m)"
 
 	case "$arch" in
-		amd64|x86_64)
-			arch=x86_64
-			fx_os="linux64"
-			fx_dir="linux-x86_64"
-			;;
-		arm64|aarch64)
-			arch=aarch64
-			fx_os="linux64-aarch64"
-			fx_dir="linux-aarch64"
-			;;
-		i386|i686)
-			arch=i686
-			fx_os="linux"
-			fx_dir="linux-i686"
-			;;
-		*)
-			die "Your system architecture is not supported: $arch"
-			;;
+	amd64 | x86_64)
+		arch=x86_64
+		fx_os="linux64"
+		fx_dir="linux-x86_64"
+		;;
+	arm64 | aarch64)
+		arch=aarch64
+		fx_os="linux64-aarch64"
+		fx_dir="linux-aarch64"
+		;;
+	i386 | i686)
+		arch=i686
+		fx_os="linux"
+		fx_dir="linux-i686"
+		;;
+	*)
+		die "Your system architecture is not supported: $arch"
+		;;
 	esac
 }
 
@@ -118,17 +121,16 @@ resolve_latest_firefox() {
 	final_url="$(curl -s -L -I -o /dev/null \
 		-w '%{url_effective}' \
 		"https://download.mozilla.org/\
-?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")" \
-		|| die "Failed to query the redirector."
+?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")" ||
+		die "Failed to query the redirector."
 
-	[[ -n "$final_url" ]] \
-		|| die "Could not resolve the Firefox download" \
-		"URL via the redirector."
+	[[ -n $final_url ]] ||
+		die "Could not resolve the Firefox download" \
+			"URL via the redirector."
 
 	file="$(basename "$final_url")"
 
-	if [[ "$file" =~ ^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$ ]]
-	then
+	if [[ $file =~ ^firefox-([0-9.]+esr)\.tar\.(xz|bz2)$ ]]; then
 		version="${BASH_REMATCH[1]}"
 	else
 		die "Could not parse the version from filename: $file"
@@ -142,11 +144,11 @@ resolve_latest_firefox() {
 
 download_firefox() {
 	log "Downloading Firefox $version"
-	curl -L -f -# -O "$final_url" \
-		|| die "Could not download the file." \
-		"Check your internet connection."
-	[[ -f "$file" ]] \
-		|| die "Downloaded file not found: $file"
+	curl -L -f -# -O "$final_url" ||
+		die "Could not download the file." \
+			"Check your internet connection."
+	[[ -f $file ]] ||
+		die "Downloaded file not found: $file"
 }
 
 verify_checksum() {
@@ -154,14 +156,14 @@ verify_checksum() {
 	local file_sum
 
 	log "Downloading SHA512SUMS and verifying checksum"
-	curl -L -f -# -O "$ftpmirror/SHA512SUMS" \
-		|| die "Could not download SHA512SUMS."
+	curl -L -f -# -O "$ftpmirror/SHA512SUMS" ||
+		die "Could not download SHA512SUMS."
 
 	recv_sum="$(awk -v f="$filepath" \
 		'$NF==f {print $1; exit}' SHA512SUMS)"
 	file_sum="$(sha512sum "$file" | awk '{print $1}')"
 
-	if [[ -z "$recv_sum" || "$recv_sum" != "$file_sum" ]]; then
+	if [[ -z $recv_sum || $recv_sum != "$file_sum" ]]; then
 		die "Checksum verification failed!"
 	fi
 
@@ -173,9 +175,9 @@ extract_archive() {
 	log "Extracting Firefox archive"
 	[[ -d ../browser ]] && rm -rf ../browser
 	case "$file" in
-		*.tar.xz)  tar xJf "$file" ;;
-		*.tar.bz2) tar xjf "$file" ;;
-		*)         tar xf  "$file"  ;;
+	*.tar.xz) tar xJf "$file" ;;
+	*.tar.bz2) tar xjf "$file" ;;
+	*) tar xf "$file" ;;
 	esac
 	rm -f "$file"
 	mv firefox ../browser
@@ -185,6 +187,7 @@ extract_archive() {
 remove_unneeded_files() {
 	local -a files_to_remove=(
 		../browser/crashreporter*
+		../browser/crashhelper
 		../browser/minidump-analyzer
 		../browser/pingsender
 		../browser/precomplete
@@ -192,10 +195,8 @@ remove_unneeded_files() {
 		../browser/update*
 		../browser/Throbber-small.gif
 		../browser/browser/crashreporter-override.ini
-		../browser/browser/features/\
-formautofill@mozilla.org.xpi
-		../browser/browser/features/\
-screenshots@mozilla.org.xpi
+		../browser/browser/features/formautofill@mozilla.org.xpi
+		../browser/browser/features/screenshots@mozilla.org.xpi
 	)
 
 	log "Removing unnecessary files"
@@ -215,8 +216,7 @@ download_noscript() {
 	log "Downloading the NoScript extension"
 	mkdir -p ../browser/browser/extensions
 	curl -L -f -# \
-		-o ../browser/browser/extensions/\
-\{73a6fe31-595d-460b-a920-fcc0f8843232\}.xpi \
+		-o ../browser/browser/extensions/\{73a6fe31-595d-460b-a920-fcc0f8843232\}.xpi \
 		"https://addons.mozilla.org/firefox/\
 downloads/latest/noscript/latest.xpi"
 }
@@ -232,8 +232,8 @@ format_distribution_policy_json() {
 	local tmp_json_file="${json_file}.tmp"
 
 	log "Formatting distribution policy JSON with jq"
-	jq . "$json_file" > "$tmp_json_file"
-	cat "$tmp_json_file" > "$json_file"
+	jq . "$json_file" >"$tmp_json_file"
+	cat "$tmp_json_file" >"$json_file"
 	rm -f "$tmp_json_file"
 }
 

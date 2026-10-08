@@ -21,6 +21,7 @@ PROXY_TIMEOUT="${PROXY_TIMEOUT:-90}"
 
 subcommand="install"
 option_router=""
+option_source=""
 non_interactive=0
 no_browser=0
 install_deps=0
@@ -41,12 +42,14 @@ Commands:
   detect       List the detected I2P router backends.
 
 Options:
-  --i2p-router=NAME   Select the backend: i2pd or i2p-java.
-  --non-interactive   Never prompt; use the stored or default backend.
-  --no-browser        Do not build the Firefox ESR bundle.
-  --no-start          Do not start the router after install/configure.
-  --install-deps      Install missing router packages automatically.
-  -h, --help          Show this help.
+  --i2p-router=NAME     Select the backend: i2pd or i2p-java.
+  --router-source=SRC   Use the system install (system) or a managed
+                        copy downloaded by I2Pd Browser (vendored).
+  --non-interactive     Never prompt; use the stored or default values.
+  --no-browser          Do not build the Firefox ESR bundle.
+  --no-start            Do not start the router after install/configure.
+  --install-deps        Install missing router packages automatically.
+  -h, --help            Show this help.
 EOF
 }
 
@@ -67,6 +70,18 @@ parse_args() {
 				exit 2
 			fi
 			option_router="$2"
+			shift 2
+			;;
+		--router-source=*)
+			option_source="${1#*=}"
+			shift
+			;;
+		--router-source)
+			if [[ $# -lt 2 ]]; then
+				router_error "--router-source requires a value."
+				exit 2
+			fi
+			option_source="$2"
 			shift 2
 			;;
 		--non-interactive)
@@ -125,7 +140,55 @@ choose_backend() {
 	router_select_interactive
 }
 
+# Choose the router source (system or vendored), mirroring
+# choose_backend.
+choose_source() {
+	local requested="$1"
+	local existing
+
+	if [[ -n $requested ]]; then
+		router_require_valid_source "$requested" || return 1
+		printf '%s\n' "$requested"
+		return 0
+	fi
+
+	existing="$(router_conf_get_source)"
+	if [[ -n $existing ]] && router_is_valid_source "$existing"; then
+		printf '%s\n' "$existing"
+		return 0
+	fi
+
+	if ((non_interactive == 1)) || [[ ! -t 0 ]]; then
+		printf '%s\n' "$I2P_ROUTER_SOURCE_DEFAULT"
+		return 0
+	fi
+
+	router_select_source_interactive
+}
+
 ensure_backend_available() {
+	if [[ ${ROUTER_SOURCE:-system} == vendored ]]; then
+		if router_is_installed; then
+			if router_is_misconfigured; then
+				router_warn "$ROUTER_BACKEND_PRETTY is installed but" \
+					"a runtime dependency is missing."
+			fi
+			return 0
+		fi
+		router_log "Installing the vendored $ROUTER_BACKEND_PRETTY" \
+			"build..."
+		if router_vendor_install && router_is_installed; then
+			if router_is_misconfigured; then
+				router_warn "$ROUTER_BACKEND_PRETTY is installed but" \
+					"a runtime dependency is missing."
+			fi
+			return 0
+		fi
+		router_error "Could not install the vendored" \
+			"$ROUTER_BACKEND_PRETTY build."
+		return 1
+	fi
+
 	if router_is_installed && ! router_is_misconfigured; then
 		return 0
 	fi
@@ -144,7 +207,8 @@ ensure_backend_available() {
 	fi
 
 	router_error "Install $ROUTER_BACKEND_PRETTY and run the" \
-		"installer again, or pass --install-deps."
+		"installer again, or pass --install-deps or" \
+		"--router-source=vendored."
 	return 1
 }
 
@@ -156,7 +220,7 @@ build_browser_if_needed() {
 	router_log "Building the Firefox ESR bundle..."
 	(
 		cd "$I2PD_BROWSER_ROOT/build" || exit 1
-		./build
+		./build.bash
 	)
 }
 
@@ -169,7 +233,7 @@ validate_browser_proxy() {
 
 	if [[ ! -r $policies ]]; then
 		router_warn "No built browser configuration to validate." \
-			"Run './build/build' before launching Firefox."
+			"Run './build/build.bash' before launching Firefox."
 		return 0
 	fi
 
@@ -206,6 +270,7 @@ print_summary() {
 	printf '\n'
 	printf 'Router      : %s\n' "$ROUTER_BACKEND_PRETTY"
 	printf 'Backend id  : %s\n' "$ROUTER_BACKEND"
+	printf 'Source      : %s\n' "$(router_source)"
 	printf 'HTTP proxy  : %s\n' "$(router_http_proxy)"
 	printf 'SOCKS proxy : %s\n' "$(router_socks_proxy)"
 	printf 'Console     : %s\n' "$(router_console_url)"
@@ -214,13 +279,14 @@ print_summary() {
 }
 
 cmd_install() {
-	local backend
+	local backend source
 
 	backend="$(choose_backend "$option_router")" || exit 1
-	router_conf_set "$backend" || exit 1
+	source="$(choose_source "$option_source")" || exit 1
+	router_conf_set "$backend" "$source" || exit 1
 	router_load_backend "$backend" || exit 1
 
-	router_log "Selected router: $ROUTER_BACKEND_PRETTY"
+	router_log "Selected router: $ROUTER_BACKEND_PRETTY ($source)"
 
 	ensure_backend_available || exit 1
 	router_prepare_config || exit 1
@@ -236,9 +302,12 @@ cmd_install() {
 
 cmd_configure() {
 	local backend="$option_router"
-	local current current_pretty
+	local source="$option_source"
+	local current current_source current_pretty
 
 	current="$(router_conf_get)"
+	current_source="$(router_conf_get_source)"
+
 	if [[ -z $backend && -n $current ]]; then
 		backend="$current"
 	fi
@@ -246,6 +315,14 @@ cmd_configure() {
 		backend="$I2P_ROUTER_DEFAULT"
 	fi
 	router_require_valid_backend "$backend" || exit 1
+
+	if [[ -z $source && -n $current_source ]]; then
+		source="$current_source"
+	fi
+	if [[ -z $source ]]; then
+		source="$I2P_ROUTER_SOURCE_DEFAULT"
+	fi
+	router_require_valid_source "$source" || exit 1
 
 	if [[ -n $current && $current != "$backend" ]] &&
 		router_is_valid_backend "$current"; then
@@ -265,9 +342,10 @@ cmd_configure() {
 		fi
 	fi
 
-	router_conf_set "$backend" || exit 1
+	router_conf_set "$backend" "$source" || exit 1
+	ROUTER_SOURCE="$source"
 	router_load_backend "$backend" || exit 1
-	router_log "Selected router: $ROUTER_BACKEND_PRETTY"
+	router_log "Selected router: $ROUTER_BACKEND_PRETTY ($source)"
 
 	ensure_backend_available || exit 1
 	router_prepare_config || exit 1
@@ -277,6 +355,10 @@ cmd_configure() {
 }
 
 load_backend_for_command() {
+	if [[ -n $option_source ]]; then
+		router_require_valid_source "$option_source" || return 1
+		ROUTER_SOURCE="$option_source"
+	fi
 	if [[ -n $option_router ]]; then
 		router_require_valid_backend "$option_router" || return 1
 		router_load_backend "$option_router" || return 1
@@ -306,6 +388,7 @@ cmd_status() {
 
 	printf 'Router      : %s\n' "$ROUTER_BACKEND_PRETTY"
 	printf 'Backend id  : %s\n' "$ROUTER_BACKEND"
+	printf 'Source      : %s\n' "$(router_source)"
 	printf 'State       : %s\n' "$(router_state)"
 	printf 'HTTP proxy  : %s\n' "$(router_http_proxy)"
 	printf 'SOCKS proxy : %s\n' "$(router_socks_proxy)"
