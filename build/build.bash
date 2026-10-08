@@ -118,11 +118,17 @@ detect_arch() {
 resolve_latest_firefox() {
 	log "Resolving latest Firefox ESR for" \
 		"$fx_os ($arch), language: $language"
-	final_url="$(curl -s -L -I -o /dev/null \
+	# -f makes curl fail on HTTP errors so an unavailable platform
+	# (for example 32-bit Linux, which Mozilla no longer publishes in
+	# the current ESR branch) is reported here instead of producing a
+	# confusing "could not parse the version" error later.
+	final_url="$(curl -fs -L -I -o /dev/null \
 		-w '%{url_effective}' \
 		"https://download.mozilla.org/\
 ?product=${ESR_PRODUCT}&os=${fx_os}&lang=${language}")" ||
-		die "Failed to query the redirector."
+		die "Failed to resolve a ${ESR_PRODUCT} build for" \
+			"$fx_os ($arch); the platform may no longer be" \
+			"published (try ESR_PRODUCT=firefox-esr-latest)."
 
 	[[ -n $final_url ]] ||
 		die "Could not resolve the Firefox download" \
@@ -206,10 +212,8 @@ remove_unneeded_files() {
 
 update_configs() {
 	log "Updating configuration files"
-	sed -i 's/Enabled=1/Enabled=0/g' \
-		../browser/application.ini || true
-	sed -i 's/ServerURL=.*/ServerURL=-/' \
-		../browser/application.ini || true
+	sed -i 's/Enabled=1/Enabled=0/g' ../browser/application.ini
+	sed -i 's/ServerURL=.*/ServerURL=-/' ../browser/application.ini
 }
 
 download_noscript() {
@@ -228,7 +232,7 @@ copy_standard_configs() {
 }
 
 format_distribution_policy_json() {
-	local json_file="preferences/distribution/policies.json"
+	local json_file="../browser/distribution/policies.json"
 	local tmp_json_file="${json_file}.tmp"
 
 	log "Formatting distribution policy JSON with jq"
@@ -254,8 +258,8 @@ main() {
 	remove_unneeded_files
 	update_configs
 	download_noscript
-	format_distribution_policy_json
 	copy_standard_configs
+	format_distribution_policy_json
 	copy_launch_scripts
 	log "Build completed"
 }

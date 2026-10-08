@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 # See the LICENSE file at the top of the project tree for copyright
 # and license details.
 #
@@ -76,6 +78,13 @@ function Start-Firefox {
     }
 
     $arguments = @('-profile', 'data') + $FirefoxArgs
+
+    # If --log points at an existing directory, keep the default file
+    # name inside it instead of failing to write to a directory.
+    if ($script:LogOutput -and
+        (Test-Path $script:LogFile -PathType Container)) {
+        $script:LogFile = Join-Path $script:LogFile 'i2pd-browser.log'
+    }
 
     if ($script:ShowUsage) {
         & $script:Firefox -profile data --help

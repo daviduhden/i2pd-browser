@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 # See the LICENSE file at the top of the project tree for copyright
 # and license details.
 #
@@ -46,7 +48,8 @@ Options:
   --non-interactive     Never prompt; use the stored or default values.
   --no-browser          Do not build the Firefox ESR bundle.
   --no-start            Do not start the router after install/configure.
-  --install-deps        Install missing router packages automatically.
+  --install-deps        Install missing router packages.
+  --no-install-deps     Do not install missing router packages (default).
   -h, --help            Show this help.
 '@
 }
@@ -89,6 +92,7 @@ function Import-Args {
             '^--no-browser$' { $script:NoBrowser = $true; $index++ }
             '^--no-start$' { $script:NoStart = $true; $index++ }
             '^--install-deps$' { $script:InstallDeps = $true; $index++ }
+            '^--no-install-deps$' { $script:InstallDeps = $false; $index++ }
             '^(-h|--help)$' { Show-Usage; exit 0 }
             default {
                 Write-RouterError "Unknown argument: $argument"
@@ -159,10 +163,11 @@ function Confirm-BackendAvailable {
             -not (Test-RouterMisconfigured)) {
             return $true
         }
-        Write-RouterError 'Automatic dependency installation failed.'
+        Write-RouterError "Install $script:ROUTER_BACKEND_PRETTY manually, or pass --router-source=vendored."
     }
-
-    Write-RouterError "Install $script:ROUTER_BACKEND_PRETTY and run the installer again, or pass --install-deps or --router-source=vendored."
+    else {
+        Write-RouterError "Install $script:ROUTER_BACKEND_PRETTY and run the installer again, or pass --install-deps or --router-source=vendored."
+    }
     return $false
 }
 
@@ -256,9 +261,11 @@ function Invoke-Configure {
     if (-not $source) { $source = $script:I2P_ROUTER_SOURCE_DEFAULT }
     if (-not (Assert-RouterSource $source)) { exit 1 }
 
-    if ($current -and $current -ne $backend -and (Test-RouterBackend $current)) {
-        Write-RouterLog "Switching from $(Get-RouterBackendPretty $current) to $(Get-RouterBackendPretty $backend)."
+    if ($current -and (Test-RouterBackend $current) -and
+        ($current -ne $backend -or $currentSource -ne $source)) {
+        Write-RouterLog "Switching from $(Get-RouterBackendPretty $current) ($currentSource) to $(Get-RouterBackendPretty $backend) ($source)."
         if (Import-RouterBackend $current) {
+            $script:ROUTER_SOURCE = $currentSource
             if (Test-RouterRunning) {
                 if (Test-RouterManaged) {
                     if (-not (Stop-Router)) { exit 1 }

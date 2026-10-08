@@ -48,7 +48,8 @@ Options:
   --non-interactive     Never prompt; use the stored or default values.
   --no-browser          Do not build the Firefox ESR bundle.
   --no-start            Do not start the router after install/configure.
-  --install-deps        Install missing router packages automatically.
+  --install-deps        Install missing router packages.
+  --no-install-deps     Do not install missing router packages (default).
   -h, --help            Show this help.
 EOF
 }
@@ -98,6 +99,10 @@ parse_args() {
 			;;
 		--install-deps)
 			install_deps=1
+			shift
+			;;
+		--no-install-deps)
+			install_deps=0
 			shift
 			;;
 		-h | --help)
@@ -203,12 +208,13 @@ ensure_backend_available() {
 			! router_is_misconfigured; then
 			return 0
 		fi
-		router_error "Automatic dependency installation failed."
+		router_error "Install $ROUTER_BACKEND_PRETTY manually, or" \
+			"pass --router-source=vendored."
+	else
+		router_error "Install $ROUTER_BACKEND_PRETTY and run the" \
+			"installer again, or pass --install-deps or" \
+			"--router-source=vendored."
 	fi
-
-	router_error "Install $ROUTER_BACKEND_PRETTY and run the" \
-		"installer again, or pass --install-deps or" \
-		"--router-source=vendored."
 	return 1
 }
 
@@ -324,12 +330,13 @@ cmd_configure() {
 	fi
 	router_require_valid_source "$source" || exit 1
 
-	if [[ -n $current && $current != "$backend" ]] &&
-		router_is_valid_backend "$current"; then
+	if [[ -n $current ]] && router_is_valid_backend "$current" &&
+		{ [[ $current != "$backend" ]] || [[ $current_source != "$source" ]]; }; then
 		current_pretty="$(router_backend_pretty "$current")"
-		router_log "Switching from $current_pretty" \
-			"to $(router_backend_pretty "$backend")."
+		router_log "Switching from $current_pretty ($current_source)" \
+			"to $(router_backend_pretty "$backend") ($source)."
 		if router_load_backend "$current"; then
+			ROUTER_SOURCE="$current_source"
 			if router_is_running; then
 				if router_is_managed; then
 					router_stop || exit 1

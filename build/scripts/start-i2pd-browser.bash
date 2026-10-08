@@ -182,6 +182,13 @@ parse_args() {
 		esac
 	done
 
+	# A --log argument that names an existing directory (for example a
+	# bare "~") is treated as the directory to hold the default log
+	# file, instead of failing when the shell tries to redirect to it.
+	if [[ -d ${logfile:-} ]]; then
+		logfile="$logfile/i2pd-browser.log"
+	fi
+
 	if [[ $show_output -eq 1 && $detach -eq 1 ]]; then
 		detach=0
 	fi
@@ -191,6 +198,11 @@ parse_args() {
 
 configure_output() {
 	if [[ $show_output -eq 0 ]]; then
+		# Fall back to /dev/null when the log directory is not
+		# writable instead of failing to redirect.
+		if [[ ! -w $(dirname "$logfile") ]]; then
+			logfile=/dev/null
+		fi
 		exec >"$logfile"
 		exec 2>"$logfile"
 	fi
@@ -237,16 +249,26 @@ setup_ibus_workaround() {
 }
 
 update_desktop_launcher() {
-	local sed_expr
+	local exec_line escaped
+
+	# The parent directory holds the relocatable .desktop copy. If it
+	# is not writable the browser can still be launched, so skip the
+	# refresh instead of aborting.
+	[[ -w .. ]] || return 0
+
 	cp start-i2pd-browser.desktop ../
-	sed_expr="s,^Exec=.*,Exec=sh -c"
-	sed_expr+=" '\"$PWD/start-i2pd-browser.bash\" --detach"
-	sed_expr+=" || ([ ! -x \"$PWD/start-i2pd-browser.bash\" ]"
+	exec_line="Exec=bash -c '\"$PWD/start-i2pd-browser.bash\" --detach"
+	exec_line+=" || ([ ! -x \"$PWD/start-i2pd-browser.bash\" ]"
 	# shellcheck disable=SC2016
-	sed_expr+=' && "$(dirname "$*")"'
-	sed_expr+="/Browser/start-i2pd-browser.bash --detach)'"
-	sed_expr+=" dummy %k,g"
-	sed -i -e "$sed_expr" ../start-i2pd-browser.desktop
+	exec_line+=' && "$(dirname "$*")"/browser/start-i2pd-browser.bash'
+	exec_line+=" --detach)' dummy %k"
+	# Escape the characters that are special in a sed replacement
+	# (&, backslash and the chosen delimiter) so the literal command
+	# is inserted instead of the matched text.
+	escaped="${exec_line//\\/\\\\}"
+	escaped="${escaped//&/\\&}"
+	escaped="${escaped//,/\\,}"
+	sed -i -e "s,^Exec=.*,$escaped," ../start-i2pd-browser.desktop
 }
 
 handle_app_registration() {
