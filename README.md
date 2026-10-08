@@ -314,9 +314,20 @@ connection: `network.proxy.failover_direct` is locked to `false`.
 
 ## Licensing
 
-The scripts and configuration files in this repository, along with the
-[i2pd software](https://github.com/PurpleI2P/i2pd/) and the
-[I2P software](https://github.com/i2p/i2p.i2p/), are licensed under the
-BSD 3-Clause "New" or "Revised" License. However, the software
-downloaded and used by these scripts and used by these configuration
-files is subject to different terms and conditions.
+The scripts and configuration files in this repository are licensed
+under the BSD 3-Clause "New" or "Revised" License; see the `LICENSE`
+file.
+
+The routers downloaded or used by these scripts keep their own terms:
+
+- [i2pd](https://github.com/PurpleI2P/i2pd/) is licensed under the BSD
+  3-Clause "New" or "Revised" License.
+- [I2P (Java)](https://github.com/i2p/i2p.i2p/) is public domain except
+  for the components listed in its `LICENSE.txt`; for example the
+  I2PTunnel HTTP and SOCKS proxies (used by this project) are GPLv2 or
+  later with an exception, I2PSnark and SusiDNS/SusiMail are GPLv2 or
+  later, and several bundled third-party libraries keep their own
+  licenses.
+
+The Firefox ESR bundle and the NoScript extension downloaded by the
+builder are subject to their own terms and conditions.
