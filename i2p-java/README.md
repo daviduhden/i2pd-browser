@@ -7,7 +7,7 @@ backend.
     data/     Effective configuration and runtime state. Generated on
               first start and ignored by Git.
 
-The `i2p-java` launcher starts the system I2P installation directly
+The `i2p-java.bash` launcher starts the system I2P installation directly
 with `-Di2p.dir.config=data`, so the router never touches the user's
 global `~/.i2p` configuration.
 

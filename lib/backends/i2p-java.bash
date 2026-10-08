@@ -21,6 +21,24 @@ BACKEND_DATA_DIR="$BACKEND_DIR/data"
 BACKEND_SCREEN_SESSION="i2p-java"
 BACKEND_CONSOLE_PORT="7657"
 
+i2p_java_vendor_dir() {
+	printf '%s/i2p-java\n' "$(router_vendor_dir)"
+}
+
+i2p_java_vendor_home() {
+	printf '%s/i2p\n' "$(i2p_java_vendor_dir)"
+}
+
+i2p_java_vendor_version() {
+	local file
+	file="$(i2p_java_vendor_dir)/VERSION"
+	[[ -r $file ]] && cat "$file"
+}
+
+i2p_java_vendor_is_installed() {
+	i2p_java_is_home "$(i2p_java_vendor_home)"
+}
+
 i2p_java_is_home() {
 	local dir="${1-}"
 	local jar
@@ -64,6 +82,15 @@ i2p_java_find_home() {
 	local candidate
 	local router_script
 	local -a candidates
+
+	if [[ ${ROUTER_SOURCE:-system} == vendored ]]; then
+		candidate="$(i2p_java_vendor_home)"
+		if i2p_java_is_home "$candidate"; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+		return 1
+	fi
 
 	for candidate in "${I2P_HOME:-}" "${I2P_BASE:-}"; do
 		[[ -n $candidate ]] || continue
@@ -118,6 +145,94 @@ i2p_java_find_java() {
 	return 1
 }
 
+# Official I2P (Java) download page. The latest stable release and its
+# installer links are resolved from here.
+i2p_java_download_page() {
+	printf 'https://geti2p.net/en/download\n'
+}
+
+i2p_java_latest_version() {
+	local html
+
+	router_have curl || {
+		router_error "curl is required to resolve the latest I2P" \
+			"release."
+		return 1
+	}
+	html="$(curl -fsSL "$(i2p_java_download_page)")" || {
+		router_error "Could not query $(i2p_java_download_page)"
+		return 1
+	}
+	printf '%s\n' "$html" |
+		grep -oE 'i2pinstall_[0-9]+\.[0-9]+\.[0-9]+\.jar' |
+		sed 's/^i2pinstall_//; s/\.jar$//' |
+		sort -V | tail -n 1
+}
+
+i2p_java_installer_url() {
+	local version="$1"
+	local html href
+
+	html="$(curl -fsSL "$(i2p_java_download_page)" 2>/dev/null ||
+		true)"
+	href="$(printf '%s\n' "$html" |
+		grep -oE "https?://[^\"']*i2pinstall_${version}\.jar" |
+		head -n 1)"
+	if [[ -z $href ]]; then
+		href="https://files.i2p-projekt.de/${version}"
+		href+="/i2pinstall_${version}.jar"
+	fi
+	printf '%s\n' "$href"
+}
+
+# Download the official I2P installer and run it into the managed
+# vendor directory. The IzPack console installer is interactive.
+backend_vendor_install() {
+	local version url dir home installer java
+
+	version="$(i2p_java_latest_version)" || {
+		router_error "Could not determine the latest I2P release."
+		return 1
+	}
+	url="$(i2p_java_installer_url "$version")" || {
+		router_error "Could not resolve the I2P installer URL."
+		return 1
+	}
+	java="$(i2p_java_find_java)" || {
+		router_error "A Java runtime is required to install I2P."
+		return 1
+	}
+
+	dir="$(i2p_java_vendor_dir)"
+	home="$(i2p_java_vendor_home)"
+	installer="$dir/i2pinstall_${version}.jar"
+	mkdir -p "$dir" "$home"
+
+	router_log "Downloading I2P (Java) $version"
+	if ! router_download "$url" "$installer"; then
+		router_error "Could not download $url"
+		return 1
+	fi
+
+	router_log "Running the I2P installer (console mode)."
+	router_log "Install into: $home"
+	(
+		cd "$dir" || exit 1
+		"$java" -jar "$installer" -console
+	) || {
+		router_error "The I2P installer did not complete."
+		return 1
+	}
+
+	if ! i2p_java_vendor_is_installed; then
+		router_error "No I2P installation found in $home."
+		return 1
+	fi
+
+	printf '%s\n' "$version" >"$dir/VERSION"
+	router_log "Vendored I2P (Java) $version installed in $home"
+}
+
 backend_dependency_hint() {
 	cat <<'EOF'
 I2P (Java) was not found, or no Java runtime is available.
@@ -126,8 +241,9 @@ Install a Java runtime and the I2P router, for example:
   Fedora        : sudo dnf install i2p java-17-openjdk-headless
   Arch          : sudo pacman -S i2p jre-openjdk-headless
   openSUSE      : sudo zypper install i2p java-17-openjdk-headless
-Or install I2P from https://geti2p.net/en/download and make it
-available in /usr/share/i2p or through the i2prouter wrapper.
+Or let I2Pd Browser download the latest stable release from i2p.net:
+  ./install.bash configure --i2p-router=i2p-java
+  ./install.bash configure --router-source=vendored
 EOF
 }
 

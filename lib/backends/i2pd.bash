@@ -15,9 +15,37 @@ BACKEND_DIR="${I2PD_BROWSER_ROOT}/i2pd"
 BACKEND_SCREEN_SESSION="i2pd"
 BACKEND_CONSOLE_PORT="7070"
 
+# Directory that holds the I2Pd Browser managed i2pd build.
+i2pd_vendor_dir() {
+	printf '%s/i2pd\n' "$(router_vendor_dir)"
+}
+
+i2pd_vendor_bin() {
+	printf '%s/i2pd\n' "$(i2pd_vendor_dir)"
+}
+
+i2pd_vendor_version() {
+	local file
+	file="$(i2pd_vendor_dir)/VERSION"
+	[[ -r $file ]] && cat "$file"
+}
+
+i2pd_vendor_is_installed() {
+	[[ -x $(i2pd_vendor_bin) ]]
+}
+
 i2pd_find_path() {
 	local -a locations
-	local location brew_prefix
+	local location brew_prefix vendored
+
+	if [[ ${ROUTER_SOURCE:-system} == vendored ]]; then
+		vendored="$(i2pd_vendor_bin)"
+		if [[ -x $vendored ]]; then
+			printf '%s\n' "$vendored"
+			return 0
+		fi
+		return 1
+	fi
 
 	locations=(
 		/usr/sbin/i2pd
@@ -53,6 +81,109 @@ i2pd_find_path() {
 	return 1
 }
 
+# Return the release asset name for the current platform.
+i2pd_vendor_asset_name() {
+	local version="$1"
+	local os arch
+
+	os="$(router_os)"
+	arch="$(router_arch)"
+
+	case "$os" in
+	linux)
+		case "$arch" in
+		x86_64) printf 'i2pd_%s-1_amd64.deb\n' "$version" ;;
+		aarch64) printf 'i2pd_%s-1_arm64.deb\n' "$version" ;;
+		i386) printf 'i2pd_%s-1_i386.deb\n' "$version" ;;
+		*) return 1 ;;
+		esac
+		;;
+	macos)
+		printf 'i2pd_%s_osx.tar.gz\n' "$version"
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+# Download and extract the latest stable i2pd release.
+backend_vendor_install() {
+	local version asset url dir tmp archive root sums
+
+	version="$(router_latest_github_release PurpleI2P/i2pd)" || {
+		router_error "Could not determine the latest i2pd release."
+		return 1
+	}
+	asset="$(i2pd_vendor_asset_name "$version")" || {
+		router_error "No vendored i2pd build for $(router_os)/$(router_arch)."
+		return 1
+	}
+
+	url="https://github.com/PurpleI2P/i2pd/releases/download"
+	url+="/${version}/${asset}"
+	dir="$(i2pd_vendor_dir)"
+	mkdir -p "$dir"
+
+	tmp="$(mktemp -d)" || return 1
+	archive="$tmp/$asset"
+	root="$tmp/root"
+
+	router_log "Downloading i2pd $version ($asset)"
+	if ! router_download "$url" "$archive"; then
+		rm -rf "$tmp"
+		router_error "Could not download $url"
+		return 1
+	fi
+
+	sums="$tmp/SHA512SUMS"
+	if ! router_download "${url%/*}/SHA512SUMS" "$sums"; then
+		rm -rf "$tmp"
+		router_error "Could not download the i2pd SHA512SUMS."
+		return 1
+	fi
+	if ! router_verify_sha512 "$archive" "$sums" "$asset"; then
+		rm -rf "$tmp"
+		return 1
+	fi
+
+	router_log "Extracting i2pd $version"
+	mkdir -p "$root"
+	case "$asset" in
+	*.deb)
+		router_extract_deb "$archive" "$root" || {
+			rm -rf "$tmp"
+			return 1
+		}
+		cp "$root/usr/bin/i2pd" "$(i2pd_vendor_bin)" || {
+			rm -rf "$tmp"
+			return 1
+		}
+		;;
+	*.tar.gz)
+		tar -xzf "$archive" -C "$root" || {
+			rm -rf "$tmp"
+			return 1
+		}
+		cp "$root/i2pd" "$(i2pd_vendor_bin)" || {
+			rm -rf "$tmp"
+			return 1
+		}
+		;;
+	*)
+		rm -rf "$tmp"
+		router_error "Unsupported i2pd archive: $asset"
+		return 1
+		;;
+	esac
+
+	chmod 0755 "$(i2pd_vendor_bin)"
+	printf '%s\n' "$version" >"$dir/VERSION"
+	rm -rf "$tmp"
+
+	router_log "Vendored i2pd $version installed in $dir"
+}
+
 backend_dependency_hint() {
 	cat <<'EOF'
 i2pd (C++) was not found.
@@ -61,7 +192,8 @@ Install it with your system package manager, for example:
   Fedora        : sudo dnf install i2pd
   Arch          : sudo pacman -S i2pd
   Homebrew      : brew install i2pd
-Or build it from source and install it into your PATH.
+Or let I2Pd Browser download a managed build (latest stable):
+  ./install.bash configure --i2p-router=i2pd --router-source=vendored
 See https://i2pd.readthedocs.io for details.
 EOF
 }

@@ -25,6 +25,11 @@ fi
 I2P_ROUTER_DEFAULT="${I2P_ROUTER_DEFAULT:-i2pd}"
 I2P_ROUTER_CHOICES=(i2pd i2p-java)
 
+# Where the router comes from: a system installation/package, or a
+# copy managed by I2Pd Browser under vendor/.
+I2P_ROUTER_SOURCE_DEFAULT="${I2P_ROUTER_SOURCE_DEFAULT:-system}"
+I2P_ROUTER_SOURCES=(system vendored)
+
 # Normalized local endpoints. Both backends are configured to listen
 # on these exact addresses, so the Firefox profile does not depend on
 # the selected router.
@@ -85,6 +90,27 @@ router_require_valid_backend() {
 	return 0
 }
 
+router_is_valid_source() {
+	local source="${1-}"
+	local valid
+
+	for valid in "${I2P_ROUTER_SOURCES[@]}"; do
+		[[ $source == "$valid" ]] && return 0
+	done
+	return 1
+}
+
+router_require_valid_source() {
+	local source="${1-}"
+
+	if ! router_is_valid_source "$source"; then
+		router_error "Unknown I2P router source: '$source'."
+		router_error "Valid values: ${I2P_ROUTER_SOURCES[*]}."
+		return 1
+	fi
+	return 0
+}
+
 # ------------------------------------------------------------------
 # Persistence of the selected backend
 # ------------------------------------------------------------------
@@ -105,17 +131,39 @@ router_conf_get() {
 	fi
 }
 
+router_conf_get_source() {
+	local file
+	file="$(router_conf_file)"
+
+	if [[ -r $file ]]; then
+		sed -n \
+			's/^[[:space:]]*I2P_ROUTER_SOURCE[[:space:]]*=[[:space:]]*//p' \
+			"$file" | tail -n 1
+	fi
+}
+
 router_conf_set() {
 	local name="$1"
+	local source="${2-}"
 	local file
 	file="$(router_conf_file)"
 
 	router_require_valid_backend "$name" || return 1
+	if [[ -z $source ]]; then
+		source="$(router_conf_get_source)"
+	fi
+	if [[ -z $source ]]; then
+		source="$I2P_ROUTER_SOURCE_DEFAULT"
+	fi
+	router_require_valid_source "$source" || return 1
+
 	cat >"$file" <<EOF
 # I2Pd Browser configuration
-# Selected I2P router backend. Change it with:
+# Selected I2P router backend and source. Change them with:
 #   ./install.bash configure --i2p-router=<i2pd|i2p-java>
+#   ./install.bash configure --router-source=<system|vendored>
 I2P_ROUTER=$name
+I2P_ROUTER_SOURCE=$source
 EOF
 }
 
@@ -141,6 +189,204 @@ router_select_interactive() {
 		return 1
 		;;
 	esac
+}
+
+router_select_source_interactive() {
+	local reply
+
+	printf '\nSelect I2P router source:\n\n'
+	printf '  1) system packages (already installed)\n'
+	printf '  2) vendored (download the latest stable release)\n\n'
+	printf 'Choice [1]: '
+
+	read -r reply || reply=""
+	case "${reply:-1}" in
+	1 | system)
+		printf 'system\n'
+		;;
+	2 | vendored)
+		printf 'vendored\n'
+		;;
+	*)
+		router_error "Invalid selection: '$reply'."
+		return 1
+		;;
+	esac
+}
+
+# ------------------------------------------------------------------
+# Router source and vendored releases
+# ------------------------------------------------------------------
+
+router_vendor_dir() {
+	printf '%s\n' \
+		"${I2PD_BROWSER_VENDOR_DIR:-$I2PD_BROWSER_ROOT/vendor}"
+}
+
+# Effective source: an explicit ROUTER_SOURCE wins, then the stored
+# value, then the default (system).
+router_source() {
+	local stored
+
+	if [[ -n ${ROUTER_SOURCE:-} ]] &&
+		router_is_valid_source "$ROUTER_SOURCE"; then
+		printf '%s\n' "$ROUTER_SOURCE"
+		return 0
+	fi
+	stored="$(router_conf_get_source)"
+	if [[ -n $stored ]] && router_is_valid_source "$stored"; then
+		printf '%s\n' "$stored"
+		return 0
+	fi
+	printf '%s\n' "$I2P_ROUTER_SOURCE_DEFAULT"
+}
+
+router_have() {
+	command -v "$1" >/dev/null 2>&1
+}
+
+router_os() {
+	case "$(uname -s)" in
+	Linux) printf 'linux\n' ;;
+	Darwin) printf 'macos\n' ;;
+	*) printf 'unknown\n' ;;
+	esac
+}
+
+router_arch() {
+	case "$(uname -m)" in
+	x86_64 | amd64) printf 'x86_64\n' ;;
+	aarch64 | arm64) printf 'aarch64\n' ;;
+	i386 | i686) printf 'i386\n' ;;
+	*) uname -m ;;
+	esac
+}
+
+router_download() {
+	local url="$1"
+	local dest="$2"
+
+	if router_have curl; then
+		curl -fL --retry 3 --retry-delay 2 -o "$dest" "$url"
+	elif router_have wget; then
+		wget -O "$dest" "$url"
+	else
+		router_error "curl or wget is required to download $url"
+		return 1
+	fi
+}
+
+router_sha512sum() {
+	local file="$1"
+
+	if router_have sha512sum; then
+		sha512sum "$file" | awk '{print $1}'
+	elif router_have shasum; then
+		shasum -a 512 "$file" | awk '{print $1}'
+	else
+		router_error "sha512sum or shasum is required."
+		return 1
+	fi
+}
+
+# Extract the expected SHA512 of a file from a SHA512SUMS file.
+router_expected_sha512() {
+	local sums_file="$1"
+	local name="$2"
+
+	awk -v n="$name" '
+		{
+			f = $2
+			sub(/^\*/, "", f)
+			if (f == n) { print $1; exit }
+		}
+	' "$sums_file"
+}
+
+# Verify a downloaded file against the SHA512SUMS of its release.
+router_verify_sha512() {
+	local file="$1"
+	local sums_file="$2"
+	local name="$3"
+	local expected
+	local actual
+
+	expected="$(router_expected_sha512 "$sums_file" "$name")"
+	actual="$(router_sha512sum "$file")" || return 1
+	if [[ -z $expected || $expected != "$actual" ]]; then
+		router_error "Checksum verification failed for $name"
+		return 1
+	fi
+	router_log "Checksum correct."
+	return 0
+}
+
+router_latest_github_release() {
+	local repo="$1"
+	local json tag
+
+	router_have curl || {
+		router_error "curl is required to resolve the latest release."
+		return 1
+	}
+	if ! json="$(curl -fsSL \
+		"https://api.github.com/repos/$repo/releases/latest")"; then
+		router_error "Could not query the latest release of $repo."
+		return 1
+	fi
+	if router_have jq; then
+		tag="$(printf '%s' "$json" | jq -r '.tag_name // empty')"
+	else
+		tag="$(printf '%s' "$json" |
+			sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' |
+			head -n 1)"
+	fi
+	[[ -n $tag ]] || {
+		router_error "Could not parse the latest release of $repo."
+		return 1
+	}
+	printf '%s\n' "${tag#v}"
+}
+
+router_extract_zip() {
+	local archive="$1"
+	local dest="$2"
+
+	if router_have unzip; then
+		unzip -o -q "$archive" -d "$dest"
+	else
+		router_error "'unzip' is required to extract $archive"
+		return 1
+	fi
+}
+
+router_extract_deb() {
+	local archive="$1"
+	local dest="$2"
+	local tmp data
+
+	if router_have dpkg-deb; then
+		dpkg-deb -x "$archive" "$dest"
+		return 0
+	fi
+	if router_have ar && router_have tar; then
+		tmp="$(mktemp -d)" || return 1
+		(
+			cd "$tmp" || exit 1
+			ar x "$archive"
+		)
+		data="$(find "$tmp" -maxdepth 1 -name 'data.tar.*' -print -quit)"
+		if [[ -z $data ]]; then
+			rm -rf "$tmp"
+			router_error "No data.tar found in $archive"
+			return 1
+		fi
+		tar -xf "$data" -C "$dest"
+		rm -rf "$tmp"
+		return 0
+	fi
+	router_error "'dpkg-deb' or 'ar'/'tar' is required for $archive"
+	return 1
 }
 
 # ------------------------------------------------------------------
@@ -179,6 +425,12 @@ router_load_backend() {
 	ROUTER_BACKEND="${BACKEND_NAME:-$name}"
 	# shellcheck disable=SC2034
 	ROUTER_BACKEND_PRETTY="${BACKEND_PRETTY:-$pretty}"
+
+	# Resolve the effective source unless the caller set one.
+	if [[ -z ${ROUTER_SOURCE:-} ]]; then
+		# shellcheck disable=SC2034
+		ROUTER_SOURCE="$(router_source)"
+	fi
 }
 
 # Populate the global ROUTER_BACKEND from the stored configuration,
@@ -253,6 +505,10 @@ router_dependency_hint() {
 
 router_install_dependencies() {
 	backend_install_dependencies
+}
+
+router_vendor_install() {
+	backend_vendor_install
 }
 
 # Human readable state of the selected backend.

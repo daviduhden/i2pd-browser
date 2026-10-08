@@ -12,3 +12,6 @@
 
 # I2P (Java) effective configuration and runtime state.
 /i2p-java/data/
+
+# Router builds downloaded by the vendored option.
+/vendor/

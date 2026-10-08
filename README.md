@@ -1,12 +1,13 @@
 # I2Pd Browser
 
-This is a script-based builder of the I2Pd Browser for Linux-based
-systems, supporting x86_64, i686 and arm64 (aarch64) architectures.
+This is a script-based builder of the I2Pd Browser for Linux and
+Windows, supporting x86_64, i686 and arm64 (aarch64) architectures.
 Any contribution is highly appreciated.
 
 The I2Pd Browser is a pre-configured version of Firefox ESR for use on
 the I2P network. It works against a generic "I2P router" abstraction,
-so it can use either of the two supported router implementations.
+so it can use either of the two supported router implementations, from
+a system installation or from a managed (vendored) copy.
 
 ## Supported I2P routers
 
@@ -68,6 +69,14 @@ sudo apt install i2p default-jre-headless screen curl tar
 The installer can also install the missing packages for the selected
 backend with `--install-deps` (using the system package manager).
 
+On Windows the same operations are provided by the PowerShell scripts
+(`install.ps1`, `i2pd/i2pd.ps1`, `i2p-java/i2p-java.ps1`), which use
+`winget` for `--install-deps`.
+
+Instead of using a system package, the installer can download a managed
+copy of the latest stable router release into `vendor/` with
+`--router-source=vendored` (see below).
+
 ## Installation
 
 1. Clone or download this repository:
@@ -83,7 +92,7 @@ backend with `--install-deps` (using the system package manager).
 	./install.bash
 	```
 
-	It asks which I2P router to use:
+	It asks which I2P router to use and where to get it from:
 
 	```
 	Select I2P router:
@@ -92,14 +101,23 @@ backend with `--install-deps` (using the system package manager).
 	  2) I2P (Java)
 
 	Choice [1]:
+	Select I2P router source:
+
+	  1) system packages (already installed)
+	  2) vendored (download the latest stable release)
+
+	Choice [1]:
 	```
+
+	The source question is only asked on the first interactive install;
+	the answer is stored in `i2pd-browser.conf`.
 
 3. Build the pre-configured Firefox if the installer did not do it, or
    rebuild it at any time:
 
 	```sh
 	cd build
-	./build
+	./build.bash
 	```
 
 4. Start the browser with the desktop entry:
@@ -117,11 +135,19 @@ package builds:
 ```sh
 ./install.bash --i2p-router=i2pd
 ./install.bash --i2p-router=i2p-java
+
+# Use a managed copy of the latest stable router release instead of a
+# system installation:
+./install.bash --i2p-router=i2pd --router-source=vendored
+./install.bash --i2p-router=i2p-java --router-source=vendored
 ```
 
 Additional options:
 
-- `--non-interactive`: never prompt; use the stored or default backend.
+- `--i2p-router=NAME`: select the backend (`i2pd` or `i2p-java`).
+- `--router-source=SRC`: use the system install (`system`, default) or
+  a managed copy downloaded by I2Pd Browser (`vendored`).
+- `--non-interactive`: never prompt; use the stored or default values.
 - `--no-browser`: do not build the Firefox ESR bundle.
 - `--no-start`: do not start the router after install/configure.
 - `--install-deps`: install missing router packages automatically.
@@ -142,8 +168,8 @@ The installer is also the router manager:
 The per-backend launchers are still available and behave as before:
 
 ```sh
-./i2pd/i2pd             # Start i2pd (C++)
-./i2p-java/i2p-java     # Start I2P (Java)
+./i2pd/i2pd.bash             # Start i2pd (C++)
+./i2p-java/i2p-java.bash     # Start I2P (Java)
 ```
 
 The router is never stopped if it was started outside I2Pd Browser
@@ -165,20 +191,40 @@ backend configuration is generated, the selection is persisted and the
 new router is started and checked. Router data (keys, netDb, ...) is
 never migrated between backends; they are independent.
 
+## Windows
+
+The same backend abstraction is available as PowerShell scripts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1 --i2p-router=i2p-java
+powershell -ExecutionPolicy Bypass -File i2pd/i2pd.ps1
+powershell -ExecutionPolicy Bypass -File i2p-java/i2p-java.ps1
+```
+
+On Windows the router is started as a hidden background process and a
+PID file is used instead of `screen`. The Firefox bundle is built with
+`build/build.ps1` and launched with
+`build/scripts/start-i2pd-browser.ps1`.
+
 ## Configuration layout
 
 ```
 lib/
-  router.bash              Shared I2P router abstraction
+  router.bash / router.ps1        Shared I2P router abstraction
   backends/
-    i2pd.bash              i2pd (C++) specific logic
-    i2p-java.bash          I2P (Java) specific logic
-i2pd/                    Vendored i2pd configuration + launcher
+    i2pd.bash / i2pd.ps1          i2pd (C++) specific logic
+    i2p-java.bash / i2p-java.ps1  I2P (Java) specific logic
+i2pd/                            Vendored i2pd configuration + launcher
 i2p-java/
-  config/                Vendored I2P (Java) configuration
-  data/                  Effective config + runtime state (ignored)
-  i2p-java               Launcher
+  config/                        Vendored I2P (Java) configuration
+  data/                          Effective config + runtime state (ignored)
+  i2p-java.bash / i2p-java.ps1   Launcher
+vendor/                          Managed router builds (ignored)
 ```
+
+- `install.bash` and `install.ps1` are the installers and managers.
+- `build/build.bash` and `build/build.ps1` build the Firefox bundle.
 
 - `i2pd/` keeps its configuration and runtime state together, which is
   the historical behaviour of this project.
