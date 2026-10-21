@@ -11,11 +11,11 @@ i18n_normalize_locale() {
 	locale="${locale%%.*}"
 	locale="${locale//_/-}"
 	case "${locale,,}" in
-	en | en-* ) printf 'en-US\n' ;;
-	es | es-* ) printf 'es-ES\n' ;;
-	ru | ru-* ) printf 'ru\n' ;;
-	zh | zh-cn | zh-hans | zh-hans-cn ) printf 'zh-CN\n' ;;
-	* ) return 1 ;;
+	en | en-*) printf 'en-US\n' ;;
+	es | es-*) printf 'es-ES\n' ;;
+	ru | ru-*) printf 'ru\n' ;;
+	zh | zh-cn | zh-hans | zh-hans-cn) printf 'zh-CN\n' ;;
+	*) return 1 ;;
 	esac
 }
 
@@ -32,10 +32,10 @@ i18n_stored_locale() {
 }
 
 i18n_system_locale() {
-	local candidate language
+	local candidate language_preferences
 	if [[ -n ${LANGUAGE:-} ]]; then
-		IFS=: read -r -a language <<<"$LANGUAGE"
-		for candidate in "${language[@]}"; do
+		IFS=: read -r -a language_preferences <<<"$LANGUAGE"
+		for candidate in "${language_preferences[@]}"; do
 			i18n_normalize_locale "$candidate" && return 0
 		done
 	fi

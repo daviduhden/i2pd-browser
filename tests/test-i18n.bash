@@ -7,7 +7,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 export I2PD_BROWSER_ROOT="$root"
 export I2PD_BROWSER_CONF="$tmp/i2pd-browser.conf"
-# shellcheck source=../lib/i18n.bash
+# shellcheck disable=SC1091
 source "$root/lib/i18n.bash"
 
 assert_eq() {
@@ -44,11 +44,11 @@ export LANGUAGE="$old_language" LC_ALL="$old_lc_all" \
 	LC_MESSAGES="$old_lc_messages" LANG="$old_lang"
 I2PD_BROWSER_LANGUAGE=zh-Hans i18n_select_locale >"$tmp/locale"
 assert_eq "$(<"$tmp/locale")" zh-CN
-(
-	export I2PD_BROWSER_LANGUAGE=zh-Hans
-	i18n_init
-	assert_eq "$I2PD_BROWSER_LANGUAGE" zh-CN
-)
+original_app_language="${I2PD_BROWSER_LANGUAGE-}"
+I2PD_BROWSER_LANGUAGE=zh-Hans
+i18n_init
+assert_eq "$I2PD_BROWSER_LANGUAGE" zh-CN
+I2PD_BROWSER_LANGUAGE="$original_app_language"
 
 # A localized catalog falls back to a key available only in English.
 cp "$root/locales/en-US.properties" "$tmp/en-US.properties"
@@ -76,7 +76,7 @@ export I2PD_BROWSER_LANGUAGE=zh-Hans
 i18n_init
 assert_eq "$I2PD_BROWSER_LANGUAGE" es-ES
 
-# shellcheck source=../lib/router.bash
+# shellcheck disable=SC1091
 source "$root/lib/router.bash"
 router_conf_set i2pd system ru
 grep -qx 'CUSTOM_SETTING=preserved' "$I2PD_BROWSER_CONF"
