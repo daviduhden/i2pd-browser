@@ -22,36 +22,41 @@ if ($env:PROXY_TIMEOUT) { $script:ProxyTimeout = [int]$env:PROXY_TIMEOUT }
 $script:Subcommand = 'install'
 $script:OptionRouter = ''
 $script:OptionSource = ''
+$script:OptionLanguage = ''
 $script:NonInteractive = $false
 $script:NoBrowser = $false
 $script:InstallDeps = $false
 $script:NoStart = $false
+$script:ShowHelp = $false
 
 function Show-Usage {
-    @'
-Usage: install.ps1 [COMMAND] [OPTIONS]
+    Get-I18nMessage 'usage.header' @('./install.ps1') | Write-Host
+    Get-I18nMessage 'usage.commands' | Write-Host
+    Get-I18nMessage 'usage.options' | Write-Host
+}
 
-Commands:
-  install      Select the I2P router and prepare the browser (default).
-  configure    Change the selected I2P router.
-  start        Start the selected I2P router.
-  stop         Stop the router started by I2Pd Browser.
-  restart      Restart the router started by I2Pd Browser.
-  status       Show the selected router and its state.
-  console      Open the router console of the selected backend.
-  detect       List the detected I2P router backends.
-
-Options:
-  --i2p-router=NAME     Select the backend: i2pd or i2p-java.
-  --router-source=SRC   Use the system install (system) or a managed
-                        copy downloaded by I2Pd Browser (vendored).
-  --non-interactive     Never prompt; use the stored or default values.
-  --no-browser          Do not build the Firefox ESR bundle.
-  --no-start            Do not start the router after install/configure.
-  --install-deps        Install missing router packages.
-  --no-install-deps     Do not install missing router packages (default).
-  -h, --help            Show this help.
-'@
+function Select-Language {
+    param([string]$Requested)
+    if ($Requested) { return (ConvertTo-I2pdBrowserLocale $Requested) }
+    if ((Get-I2pdBrowserStoredLocale) -or $env:I2PD_BROWSER_LANGUAGE -or
+        $env:language -or $script:NonInteractive -or
+        -not [Environment]::UserInteractive) {
+        return (Select-I2pdBrowserLocale)
+    }
+    Get-I18nMessage 'prompt.language' | Write-Host
+    $reply = Read-Host
+    switch ($reply) {
+        '' { return 'en-US' }
+        '1' { return 'en-US' }
+        'en-US' { return 'en-US' }
+        '2' { return 'es-ES' }
+        'es-ES' { return 'es-ES' }
+        '3' { return 'ru' }
+        'ru' { return 'ru' }
+        '4' { return 'zh-CN' }
+        'zh-CN' { return 'zh-CN' }
+        default { return $null }
+    }
 }
 
 function Import-Args {
@@ -68,11 +73,24 @@ function Import-Args {
                 $script:OptionRouter = $Matches[1]
                 $index++
             }
+            '^--language=(.*)$' {
+                $script:OptionLanguage = $Matches[1]
+                $index++
+            }
+            '^--language$' {
+                if ($index + 1 -ge $Arguments.Count) {
+                    Write-RouterError (Get-I18nMessage 'error.argument-value' @('--language'))
+                    exit 2
+                }
+                $script:OptionLanguage = $Arguments[$index + 1]
+                $index += 2
+            }
             '^--i2p-router$' {
                 if ($index + 1 -ge $Arguments.Count) {
                     Write-RouterError '--i2p-router requires a value.'
                     exit 2
                 }
+
                 $script:OptionRouter = $Arguments[$index + 1]
                 $index += 2
             }
@@ -93,7 +111,7 @@ function Import-Args {
             '^--no-start$' { $script:NoStart = $true; $index++ }
             '^--install-deps$' { $script:InstallDeps = $true; $index++ }
             '^--no-install-deps$' { $script:InstallDeps = $false; $index++ }
-            '^(-h|--help)$' { Show-Usage; exit 0 }
+            '^(-h|--help)$' { $script:ShowHelp = $true; $index++ }
             default {
                 Write-RouterError "Unknown argument: $argument"
                 Show-Usage
@@ -173,12 +191,16 @@ function Confirm-BackendAvailable {
 
 function Build-BrowserIfNeeded {
     $firefox = Join-Path $script:I2PD_BROWSER_ROOT 'browser/firefox.exe'
-    if (Test-Path $firefox) {
+    $localeFile = Join-Path $script:I2PD_BROWSER_ROOT 'browser/.i2pd-browser-locale'
+    if ((Test-Path $firefox) -and (Test-Path $localeFile) -and
+        ((Get-Content $localeFile -Raw).Trim() -eq
+            $script:I2pdBrowserLanguage)) {
         Write-RouterLog 'The Firefox ESR bundle is already built.'
         return $true
     }
     Write-RouterLog 'Building the Firefox ESR bundle...'
-    & (Join-Path $script:I2PD_BROWSER_ROOT 'build/build.ps1')
+    & (Join-Path $script:I2PD_BROWSER_ROOT 'build/build.ps1') `
+        "--language=$script:I2pdBrowserLanguage"
     return ($LASTEXITCODE -eq 0)
 }
 
@@ -214,23 +236,30 @@ function Wait-ProxyOrWarn {
 
 function Show-Summary {
     Write-Host ''
-    Write-Host "Router      : $script:ROUTER_BACKEND_PRETTY"
-    Write-Host "Backend id  : $script:ROUTER_BACKEND"
-    Write-Host "Source      : $(Get-RouterSource)"
-    Write-Host "HTTP proxy  : $(Get-RouterHttpProxy)"
-    Write-Host "SOCKS proxy : $(Get-RouterSocksProxy)"
-    Write-Host "Console     : $(Get-RouterConsoleUrl)"
+    Get-I18nMessage 'status.language' @($script:I2pdBrowserLanguage) | Write-Host
+    Get-I18nMessage 'status.router' @($script:ROUTER_BACKEND_PRETTY) | Write-Host
+    Get-I18nMessage 'status.backend' @($script:ROUTER_BACKEND) | Write-Host
+    Get-I18nMessage 'status.source' @(Get-RouterSource) | Write-Host
+    Get-I18nMessage 'status.http-proxy' @(Get-RouterHttpProxy) | Write-Host
+    Get-I18nMessage 'status.socks-proxy' @(Get-RouterSocksProxy) | Write-Host
+    Get-I18nMessage 'status.console' @(Get-RouterConsoleUrl) | Write-Host
     Write-Host ''
     Write-Host 'Run start-i2pd-browser.ps1 to launch Firefox.'
 }
 
 function Invoke-Install {
+    $locale = Select-Language -Requested $script:OptionLanguage
+    if (-not $locale) {
+        Write-RouterError (Get-I18nMessage 'language.invalid' @($script:OptionLanguage))
+        exit 2
+    }
+    [void](Initialize-I2pdBrowserI18n $locale)
     $backend = Select-BackendName -Requested $script:OptionRouter
     if (-not $backend) { exit 1 }
     $source = Select-SourceName -Requested $script:OptionSource
     if (-not $source) { exit 1 }
 
-    if (-not (Set-RouterConf -Name $backend -Source $source)) { exit 1 }
+    if (-not (Set-RouterConf -Name $backend -Source $source -Language $locale)) { exit 1 }
     if (-not (Import-RouterBackend $backend)) { exit 1 }
 
     Write-RouterLog "Selected router: $script:ROUTER_BACKEND_PRETTY ($source)"
@@ -277,13 +306,22 @@ function Invoke-Configure {
         }
     }
 
-    if (-not (Set-RouterConf -Name $backend -Source $source)) { exit 1 }
+    $locale = Select-I2pdBrowserLocale $script:OptionLanguage
+    if (-not $locale) {
+        Write-RouterError (Get-I18nMessage 'language.invalid' @($script:OptionLanguage))
+        exit 2
+    }
+    [void](Initialize-I2pdBrowserI18n $locale)
+    if (-not (Set-RouterConf -Name $backend -Source $source -Language $locale)) { exit 1 }
     $script:ROUTER_SOURCE = $source
     if (-not (Import-RouterBackend $backend)) { exit 1 }
     Write-RouterLog "Selected router: $script:ROUTER_BACKEND_PRETTY ($source)"
 
     if (-not (Confirm-BackendAvailable)) { exit 1 }
     if (-not (Invoke-RouterPrepareConfig)) { exit 1 }
+    if (-not $script:NoBrowser) {
+        if (-not (Build-BrowserIfNeeded)) { exit 1 }
+    }
     Test-BrowserProxy | Out-Null
     if (-not (Wait-ProxyOrWarn)) { exit 1 }
     Show-Summary
@@ -319,13 +357,14 @@ function Invoke-RestartCommand {
 
 function Invoke-StatusCommand {
     if (-not (Import-BackendForCommand)) { exit 1 }
-    Write-Host "Router      : $script:ROUTER_BACKEND_PRETTY"
-    Write-Host "Backend id  : $script:ROUTER_BACKEND"
-    Write-Host "Source      : $(Get-RouterSource)"
-    Write-Host "State       : $(Get-RouterState)"
-    Write-Host "HTTP proxy  : $(Get-RouterHttpProxy)"
-    Write-Host "SOCKS proxy : $(Get-RouterSocksProxy)"
-    Write-Host "Console     : $(Get-RouterConsoleUrl)"
+    Get-I18nMessage 'status.language' @($script:I2pdBrowserLanguage) | Write-Host
+    Get-I18nMessage 'status.router' @($script:ROUTER_BACKEND_PRETTY) | Write-Host
+    Get-I18nMessage 'status.backend' @($script:ROUTER_BACKEND) | Write-Host
+    Get-I18nMessage 'status.source' @(Get-RouterSource) | Write-Host
+    Get-I18nMessage 'status.state' @(Get-RouterState) | Write-Host
+    Get-I18nMessage 'status.http-proxy' @(Get-RouterHttpProxy) | Write-Host
+    Get-I18nMessage 'status.socks-proxy' @(Get-RouterSocksProxy) | Write-Host
+    Get-I18nMessage 'status.console' @(Get-RouterConsoleUrl) | Write-Host
 }
 
 function Invoke-ConsoleCommand {
@@ -347,6 +386,18 @@ function Invoke-DetectCommand {
 }
 
 Import-Args -Arguments $args
+if ($script:OptionLanguage) {
+    if (-not (Initialize-I2pdBrowserI18n $script:OptionLanguage)) {
+        Write-RouterError (
+            Get-I18nMessage 'language.invalid' @($script:OptionLanguage)
+        )
+        exit 2
+    }
+}
+if ($script:ShowHelp) {
+    Show-Usage
+    exit 0
+}
 switch ($script:Subcommand) {
     'install' { Invoke-Install }
     'configure' { Invoke-Configure }

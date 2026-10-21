@@ -10,6 +10,15 @@
 
 set -Eeuo pipefail
 
+_launcher_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+I2PD_BROWSER_ROOT="$_launcher_dir"
+# shellcheck source=../../lib/i18n.bash
+source "$_launcher_dir/i18n.bash"
+_launcher_locale="$(cat "$_launcher_dir/.i2pd-browser-locale" 2>/dev/null ||
+	printf 'en-US')"
+i18n_init "$_launcher_locale" || i18n_init en-US
+unset _launcher_dir _launcher_locale
+
 log() {
 	printf '%s [INFO] %s\n' \
 		"$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -58,22 +67,7 @@ ${complain_message%%[!$'\n']*}"}"
 
 # Show script usage
 browser_usage() {
-	printf '\nI2Pd Browser Script Options\n'
-	printf '%s\n' \
-		"  --verbose           Display Firefox" \
-		" output in the terminal"
-	printf '%s\n' \
-		"  --log [file]        Record Firefox" \
-		" output to file (default: i2pd-browser.log)"
-	printf '%s\n' \
-		"  --detach            Detach from" \
-		" terminal and run I2Pd Browser in the background"
-	printf '%s\n' \
-		"  --register-app      Register I2Pd" \
-		" Browser as a desktop app for this user"
-	printf '%s\n' \
-		"  --unregister-app    Unregister I2Pd" \
-		" Browser as a desktop app for this user"
+	i18n_message launcher.usage
 }
 
 log_output=0
@@ -91,8 +85,7 @@ check_runtime() {
 	local cpu_arch
 
 	if [[ "$(id -u)" -eq 0 ]]; then
-		complain "The I2Pd Browser Bundle should not be run" \
-			" as root. Exiting."
+		complain "The I2Pd Browser Bundle should not be run as root. Exiting."
 		exit 1
 	fi
 

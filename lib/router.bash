@@ -21,6 +21,13 @@ if [[ -z ${I2PD_BROWSER_ROOT:-} ]]; then
 	unset _router_lib_dir
 fi
 
+if ! declare -F i18n_init >/dev/null; then
+	# shellcheck source=lib/i18n.bash
+	# shellcheck disable=SC1091
+	source "$I2PD_BROWSER_ROOT/lib/i18n.bash"
+fi
+i18n_init
+
 # Internal backend identifier and human readable names.
 I2P_ROUTER_DEFAULT="${I2P_ROUTER_DEFAULT:-i2pd}"
 I2P_ROUTER_CHOICES=(i2pd i2p-java)
@@ -53,6 +60,10 @@ router_error() {
 		"$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2
 }
 
+router_t() {
+	i18n_message "$@"
+}
+
 # ------------------------------------------------------------------
 # Backend description helpers
 # ------------------------------------------------------------------
@@ -79,11 +90,11 @@ router_require_valid_backend() {
 	local name="${1-}"
 
 	if [[ -z $name ]]; then
-		router_error "No I2P router backend was specified."
+		router_error "$(router_t error.no-backend)"
 		return 1
 	fi
 	if ! router_is_valid_backend "$name"; then
-		router_error "Unknown I2P router backend: '$name'."
+		router_error "$(router_t error.invalid-backend "$name")"
 		router_error "Valid values: ${I2P_ROUTER_CHOICES[*]}."
 		return 1
 	fi
@@ -104,7 +115,7 @@ router_require_valid_source() {
 	local source="${1-}"
 
 	if ! router_is_valid_source "$source"; then
-		router_error "Unknown I2P router source: '$source'."
+		router_error "$(router_t error.invalid-source "$source")"
 		router_error "Valid values: ${I2P_ROUTER_SOURCES[*]}."
 		return 1
 	fi
@@ -143,9 +154,7 @@ router_conf_get_source() {
 }
 
 router_conf_set() {
-	local name="$1"
-	local source="${2-}"
-	local file
+	local name="$1" source="${2-}" selected_locale="${3-}" file tmp
 	file="$(router_conf_file)"
 
 	router_require_valid_backend "$name" || return 1
@@ -156,25 +165,31 @@ router_conf_set() {
 		source="$I2P_ROUTER_SOURCE_DEFAULT"
 	fi
 	router_require_valid_source "$source" || return 1
-
-	cat >"$file" <<EOF
-# I2Pd Browser configuration
-# Selected I2P router backend and source. Change them with:
-#   ./install.bash configure --i2p-router=<i2pd|i2p-java>
-#   ./install.bash configure --router-source=<system|vendored>
-I2P_ROUTER=$name
-I2P_ROUTER_SOURCE=$source
-EOF
+	[[ -n $selected_locale ]] || selected_locale="$I2PD_BROWSER_LANGUAGE"
+	selected_locale="$(i18n_normalize_locale "$selected_locale")" || return 1
+	tmp="${file}.tmp.$$"
+	{
+		if [[ -r $file ]]; then
+			sed '/^[[:space:]]*I2P_ROUTER[[:space:]]*=/d;
+			     /^[[:space:]]*I2P_ROUTER_SOURCE[[:space:]]*=/d;
+			     /^[[:space:]]*I2PD_BROWSER_LANGUAGE[[:space:]]*=/d' "$file"
+		else
+			printf '%s\n' '# I2Pd Browser configuration'
+		fi
+		printf 'I2P_ROUTER=%s\n' "$name"
+		printf 'I2P_ROUTER_SOURCE=%s\n' "$source"
+		printf 'I2PD_BROWSER_LANGUAGE=%s\n' "$selected_locale"
+	} >"$tmp" && mv "$tmp" "$file"
 }
 
 # Interactive selection. Returns the chosen identifier on stdout.
 router_select_interactive() {
 	local reply
 
-	printf '\nSelect I2P router:\n\n'
+	printf '\n%s\n\n' "$(router_t prompt.router)"
 	printf '  1) %s\n' "$(router_backend_pretty i2pd)"
 	printf '  2) %s\n\n' "$(router_backend_pretty i2p-java)"
-	printf 'Choice [1]: '
+	printf '%s ' "$(router_t prompt.choice)"
 
 	read -r reply || reply=""
 	case "${reply:-1}" in
@@ -185,7 +200,7 @@ router_select_interactive() {
 		printf 'i2p-java\n'
 		;;
 	*)
-		router_error "Invalid selection: '$reply'."
+		router_error "$(router_t error.invalid-selection "$reply")"
 		return 1
 		;;
 	esac
@@ -194,10 +209,10 @@ router_select_interactive() {
 router_select_source_interactive() {
 	local reply
 
-	printf '\nSelect I2P router source:\n\n'
-	printf '  1) system packages (already installed)\n'
-	printf '  2) vendored (download the latest stable release)\n\n'
-	printf 'Choice [1]: '
+	printf '\n%s\n\n' "$(router_t prompt.source)"
+	printf '  1) %s\n' "$(router_t source.system)"
+	printf '  2) %s\n\n' "$(router_t source.vendored)"
+	printf '%s ' "$(router_t prompt.choice)"
 
 	read -r reply || reply=""
 	case "${reply:-1}" in
@@ -208,7 +223,7 @@ router_select_source_interactive() {
 		printf 'vendored\n'
 		;;
 	*)
-		router_error "Invalid selection: '$reply'."
+		router_error "$(router_t error.invalid-selection "$reply")"
 		return 1
 		;;
 	esac
@@ -514,21 +529,20 @@ router_vendor_install() {
 # Human readable state of the selected backend.
 router_state() {
 	if ! backend_is_installed; then
-		printf 'not-installed\n'
+		router_t state.not-installed
 	elif backend_is_running; then
-		printf 'running\n'
+		router_t state.running
 	elif backend_is_misconfigured; then
-		printf 'misconfigured\n'
+		router_t state.misconfigured
 	else
-		printf 'stopped\n'
+		router_t state.stopped
 	fi
 }
 
 router_start() {
 	if backend_is_running; then
 		if backend_is_managed; then
-			router_log "The I2P router is already running" \
-				"(managed by I2Pd Browser)."
+			router_log "The I2P router is already running (managed by I2Pd Browser)."
 		else
 			router_log "An I2P router instance is already running" \
 				"(not managed by I2Pd Browser)."
@@ -537,16 +551,16 @@ router_start() {
 	fi
 
 	if ! backend_is_installed; then
-		router_error "The selected I2P router is not installed."
+		router_error "$(router_t error.router-not-installed)"
 		backend_dependency_hint >&2 || true
 		return 1
 	fi
 	if ! command -v screen >/dev/null 2>&1; then
-		router_error "Required command 'screen' not found."
+		router_error "$(router_t error.screen)"
 		return 1
 	fi
 	if backend_is_misconfigured; then
-		router_error "The selected I2P router is not runnable."
+		router_error "$(router_t error.router-not-runnable)"
 		backend_dependency_hint >&2 || true
 		return 1
 	fi

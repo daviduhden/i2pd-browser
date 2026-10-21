@@ -17,8 +17,11 @@ $ErrorActionPreference = 'Stop'
 $script:BuildDir = (Resolve-Path $PSScriptRoot).Path
 $script:RepoRoot = (Resolve-Path (Join-Path $script:BuildDir '..')).Path
 $script:BrowserDir = Join-Path $script:RepoRoot 'browser'
+$script:I2PD_BROWSER_ROOT = $script:RepoRoot
+. (Join-Path $script:RepoRoot 'lib/i18n.ps1')
+[void](Initialize-I2pdBrowserI18n)
 
-$script:Language = if ($env:language) { $env:language } else { 'en-US' }
+$script:Language = $script:I2pdBrowserLanguage
 $script:EsrProduct = if ($env:ESR_PRODUCT) {
     $env:ESR_PRODUCT
 }
@@ -40,11 +43,45 @@ function Get-FirefoxOs {
     }
 }
 
+function Import-BuildArgs {
+    param([string[]]$Arguments)
+    $index = 0
+    while ($index -lt $Arguments.Count) {
+        $argument = $Arguments[$index]
+        if ($argument -like '--language=*') {
+            $script:Language = $argument.Substring(11)
+        }
+        elseif ($argument -eq '--language') {
+            if ($index + 1 -ge $Arguments.Count) {
+                Stop-Build (Get-I18nMessage 'error.argument-value' @('--language'))
+            }
+            $script:Language = $Arguments[$index + 1]
+            $index++
+        }
+        elseif ($argument -in @('-h', '--help')) {
+            Get-I18nMessage 'usage.header' @('./build.ps1') | Write-Host
+            Get-I18nMessage 'usage.options' | Write-Host
+            exit 0
+        }
+        else {
+            Stop-Build (Get-I18nMessage 'error.unknown-argument' @($argument))
+        }
+        $index++
+    }
+    $locale = ConvertTo-I2pdBrowserLocale $script:Language
+    if (-not $locale) {
+        Stop-Build (Get-I18nMessage 'language.invalid' @($script:Language))
+    }
+    $script:Language = $locale
+    [void](Initialize-I2pdBrowserI18n $locale)
+}
+
 function Resolve-FirefoxDownload {
     $os = Get-FirefoxOs
     $url = 'https://download.mozilla.org/?product=' + $script:EsrProduct +
     "&os=$os&lang=$script:Language"
-    Write-BuildLog "Resolving latest Firefox ESR for $os, language: $script:Language"
+    Write-BuildLog (Get-I18nMessage 'info.build.resolve' @(
+            $os, $script:Language))
     try {
         # HEAD follows the redirector without downloading the installer.
         $response = Invoke-WebRequest -Uri $url -Method Head `
@@ -123,7 +160,7 @@ function Install-Firefox {
     )
     $installer = Join-Path $tmp $fileName
 
-    Write-BuildLog "Downloading Firefox $Version"
+    Write-BuildLog (Get-I18nMessage 'info.build.downloading' @($Version))
     Invoke-WebRequest -Uri $Url -OutFile $installer -UseBasicParsing
 
     # SHA512SUMS lives at the release root, not in the platform
@@ -144,9 +181,9 @@ function Install-Firefox {
     }
     $actual = (Get-FileHash -Path $installer -Algorithm SHA512).Hash
     if ($actual -ne $expected.ToUpperInvariant()) {
-        Stop-Build 'Checksum verification failed.'
+        Stop-Build (Get-I18nMessage 'error.checksum')
     }
-    Write-BuildLog 'Checksum correct.'
+    Write-BuildLog (Get-I18nMessage 'info.build.checksum-ok')
 
     Write-BuildLog 'Installing Firefox'
     $process = Start-Process -FilePath $installer -Wait -PassThru `
@@ -161,7 +198,7 @@ function Install-Firefox {
 }
 
 function Remove-UnneededFiles {
-    Write-BuildLog 'Removing unnecessary files'
+    Write-BuildLog (Get-I18nMessage 'info.build.removing')
     $targets = @(
         'crashreporter.exe'
         'crashreporter'
@@ -190,7 +227,7 @@ function Remove-UnneededFiles {
 }
 
 function Update-Configs {
-    Write-BuildLog 'Updating configuration files'
+    Write-BuildLog (Get-I18nMessage 'info.build.configuring')
     $ini = Join-Path $script:BrowserDir 'application.ini'
     if (Test-Path $ini) {
         (Get-Content $ini) `
@@ -201,7 +238,7 @@ function Update-Configs {
 }
 
 function Install-NoScript {
-    Write-BuildLog 'Downloading the NoScript extension'
+    Write-BuildLog (Get-I18nMessage 'info.build.noscript')
     $extensions = Join-Path $script:BrowserDir 'browser\extensions'
     New-Item -ItemType Directory -Force -Path $extensions | Out-Null
     $target = Join-Path $extensions `
@@ -215,7 +252,7 @@ function Format-PoliciesJson {
     # Format the copy in the built browser so the tracked source file is
     # never rewritten (ConvertTo-Json escapes differently from jq).
     $policies = Join-Path $script:BrowserDir 'distribution\policies.json'
-    Write-BuildLog 'Formatting distribution policy JSON'
+    Write-BuildLog (Get-I18nMessage 'info.build.configuring')
     $data = Get-Content $policies -Raw | ConvertFrom-Json
     $json = $data | ConvertTo-Json -Depth 100
     # Write UTF-8 without a BOM: Windows PowerShell 5.1 adds one with
@@ -225,7 +262,7 @@ function Format-PoliciesJson {
 }
 
 function Copy-StandardConfigs {
-    Write-BuildLog 'Adding standard configs'
+    Write-BuildLog (Get-I18nMessage 'info.build.standard-config')
     Copy-Item -Recurse -Force `
         (Join-Path $script:BuildDir 'preferences\*') $script:BrowserDir
     Copy-Item -Recurse -Force `
@@ -233,24 +270,45 @@ function Copy-StandardConfigs {
         (Join-Path $script:BrowserDir 'data')
 }
 
+function Set-FirefoxLocale {
+    $profile = Join-Path $script:BrowserDir 'data'
+    $userJs = Join-Path $profile 'user.js'
+    $content = @(
+        '// Generated by I2Pd Browser; do not edit.'
+        ('user_pref("intl.locale.requested", "' + $script:Language + '");')
+    )
+    $utf8 = New-Object Text.UTF8Encoding $false
+    [IO.File]::WriteAllLines($userJs, $content, $utf8)
+    [IO.File]::WriteAllText(
+        (Join-Path $script:BrowserDir '.i2pd-browser-locale'),
+        $script:Language + [Environment]::NewLine, $utf8
+    )
+}
+
 function Copy-LaunchScripts {
-    Write-BuildLog 'Copying launch scripts'
+    Write-BuildLog (Get-I18nMessage 'info.build.launchers')
     Copy-Item -Recurse -Force `
         (Join-Path $script:BuildDir 'scripts\*') $script:BrowserDir
+    Copy-Item -Force (Join-Path $script:RepoRoot 'lib\i18n.ps1') `
+        $script:BrowserDir
+    Copy-Item -Recurse -Force (Join-Path $script:RepoRoot 'locales') `
+        $script:BrowserDir
 }
 
 function Main {
+    Import-BuildArgs -Arguments $args
     $url = Resolve-FirefoxDownload
     $version = Get-FirefoxVersion -Url $url
-    Write-BuildLog "Preparing Firefox version $version for use with I2Pd"
+    Write-BuildLog (Get-I18nMessage 'info.build.preparing' @($version))
     Install-Firefox -Url $url -Version $version
     Remove-UnneededFiles
     Update-Configs
     Install-NoScript
     Copy-StandardConfigs
+    Set-FirefoxLocale
     Format-PoliciesJson
     Copy-LaunchScripts
-    Write-BuildLog 'Build completed'
+    Write-BuildLog (Get-I18nMessage 'info.build.complete')
 }
 
 # Router helpers used above are defined in lib/router.ps1.
