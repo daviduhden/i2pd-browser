@@ -22,36 +22,17 @@ PROXY_TIMEOUT="${PROXY_TIMEOUT:-90}"
 subcommand="install"
 option_router=""
 option_source=""
+option_language=""
 non_interactive=0
 no_browser=0
 install_deps=0
 no_start=0
+show_help=0
 
 usage() {
-	cat <<'EOF'
-Usage: install.bash [COMMAND] [OPTIONS]
-
-Commands:
-  install      Select the I2P router and prepare the browser (default).
-  configure    Change the selected I2P router.
-  start        Start the selected I2P router.
-  stop         Stop the router started by I2Pd Browser.
-  restart      Restart the router started by I2Pd Browser.
-  status       Show the selected router and its state.
-  console      Open the router console of the selected backend.
-  detect       List the detected I2P router backends.
-
-Options:
-  --i2p-router=NAME     Select the backend: i2pd or i2p-java.
-  --router-source=SRC   Use the system install (system) or a managed
-                        copy downloaded by I2Pd Browser (vendored).
-  --non-interactive     Never prompt; use the stored or default values.
-  --no-browser          Do not build the Firefox ESR bundle.
-  --no-start            Do not start the router after install/configure.
-  --install-deps        Install missing router packages.
-  --no-install-deps     Do not install missing router packages (default).
-  -h, --help            Show this help.
-EOF
+	router_t usage.header "./install.bash"
+	router_t usage.commands
+	router_t usage.options
 }
 
 parse_args() {
@@ -64,6 +45,18 @@ parse_args() {
 		--i2p-router=*)
 			option_router="${1#*=}"
 			shift
+			;;
+		--language=*)
+			option_language="${1#*=}"
+			shift
+			;;
+		--language)
+			if [[ $# -lt 2 ]]; then
+				router_error "$(router_t error.argument-value --language)"
+				exit 2
+			fi
+			option_language="$2"
+			shift 2
 			;;
 		--i2p-router)
 			if [[ $# -lt 2 ]]; then
@@ -106,8 +99,8 @@ parse_args() {
 			shift
 			;;
 		-h | --help)
-			usage
-			exit 0
+			show_help=1
+			shift
 			;;
 		*)
 			router_error "Unknown argument: $1"
@@ -116,6 +109,29 @@ parse_args() {
 			;;
 		esac
 	done
+}
+
+choose_language() {
+	local requested="$1" selected reply
+	if [[ -n $requested ]]; then
+		selected="$(i18n_normalize_locale "$requested")" || return 1
+		printf '%s\n' "$selected"
+		return 0
+	fi
+	if [[ -n $(i18n_stored_locale) || -n ${I2PD_BROWSER_LANGUAGE:-${language:-}} ]] ||
+		((non_interactive == 1)) || [[ ! -t 0 ]]; then
+		i18n_select_locale
+		return 0
+	fi
+	router_t prompt.language
+	read -r reply || reply=""
+	case "${reply:-1}" in
+	1 | en-US) printf 'en-US\n' ;;
+	2 | es-ES) printf 'es-ES\n' ;;
+	3 | ru) printf 'ru\n' ;;
+	4 | zh-CN) printf 'zh-CN\n' ;;
+	*) return 1 ;;
+	esac
 }
 
 # Choose the backend from the command line, the stored value, the
@@ -219,14 +235,17 @@ ensure_backend_available() {
 }
 
 build_browser_if_needed() {
-	if [[ -x "$I2PD_BROWSER_ROOT/browser/firefox" ]]; then
-		router_log "The Firefox ESR bundle is already built."
+	local locale_file="$I2PD_BROWSER_ROOT/browser/.i2pd-browser-locale"
+	if [[ -x "$I2PD_BROWSER_ROOT/browser/firefox" ]] &&
+		[[ -r $locale_file ]] &&
+		[[ $(<"$locale_file") == "$I2PD_BROWSER_LANGUAGE" ]]; then
+		router_log "$(router_t info.bundle-built)"
 		return 0
 	fi
-	router_log "Building the Firefox ESR bundle..."
+	router_log "$(router_t info.building)"
 	(
 		cd "$I2PD_BROWSER_ROOT/build" || exit 1
-		./build.bash
+		./build.bash --language="$I2PD_BROWSER_LANGUAGE"
 	)
 }
 
@@ -253,7 +272,7 @@ validate_browser_proxy() {
 		fi
 	fi
 
-	router_log "Firefox proxy endpoint: $expected"
+	router_log "$(router_t info.proxy "$expected")"
 	return 0
 }
 
@@ -274,25 +293,31 @@ wait_for_proxy_or_warn() {
 
 print_summary() {
 	printf '\n'
-	printf 'Router      : %s\n' "$ROUTER_BACKEND_PRETTY"
-	printf 'Backend id  : %s\n' "$ROUTER_BACKEND"
-	printf 'Source      : %s\n' "$(router_source)"
-	printf 'HTTP proxy  : %s\n' "$(router_http_proxy)"
-	printf 'SOCKS proxy : %s\n' "$(router_socks_proxy)"
-	printf 'Console     : %s\n' "$(router_console_url)"
+	router_t status.language "$I2PD_BROWSER_LANGUAGE"
+	router_t status.router "$ROUTER_BACKEND_PRETTY"
+	router_t status.backend "$ROUTER_BACKEND"
+	router_t status.source "$(router_source)"
+	router_t status.http-proxy "$(router_http_proxy)"
+	router_t status.socks-proxy "$(router_socks_proxy)"
+	router_t status.console "$(router_console_url)"
 	printf '\n'
 	printf 'Run ./start-i2pd-browser.desktop to launch Firefox.\n'
 }
 
 cmd_install() {
-	local backend source
+	local backend source selected_language
 
+	selected_language="$(choose_language "$option_language")" || {
+		router_error "$(router_t language.invalid "$option_language")"
+		exit 2
+	}
+	i18n_init "$selected_language"
 	backend="$(choose_backend "$option_router")" || exit 1
 	source="$(choose_source "$option_source")" || exit 1
-	router_conf_set "$backend" "$source" || exit 1
+	router_conf_set "$backend" "$source" "$selected_language" || exit 1
 	router_load_backend "$backend" || exit 1
 
-	router_log "Selected router: $ROUTER_BACKEND_PRETTY ($source)"
+	router_log "$(router_t status.selected-router "$ROUTER_BACKEND_PRETTY" "$source")"
 
 	ensure_backend_available || exit 1
 	router_prepare_config || exit 1
@@ -307,7 +332,7 @@ cmd_install() {
 }
 
 cmd_configure() {
-	local backend="$option_router"
+	local backend="$option_router" selected_language
 	local source="$option_source"
 	local current current_source current_pretty
 
@@ -349,13 +374,21 @@ cmd_configure() {
 		fi
 	fi
 
-	router_conf_set "$backend" "$source" || exit 1
+	selected_language="$(i18n_select_locale "$option_language")" || {
+		router_error "$(router_t language.invalid "$option_language")"
+		exit 2
+	}
+	i18n_init "$selected_language"
+	router_conf_set "$backend" "$source" "$selected_language" || exit 1
 	ROUTER_SOURCE="$source"
 	router_load_backend "$backend" || exit 1
-	router_log "Selected router: $ROUTER_BACKEND_PRETTY ($source)"
+	router_log "$(router_t status.selected-router "$ROUTER_BACKEND_PRETTY" "$source")"
 
 	ensure_backend_available || exit 1
 	router_prepare_config || exit 1
+	if ((no_browser == 0)); then
+		build_browser_if_needed || exit 1
+	fi
 	validate_browser_proxy || true
 	wait_for_proxy_or_warn || exit 1
 	print_summary
@@ -393,13 +426,14 @@ cmd_restart() {
 cmd_status() {
 	load_backend_for_command || exit 1
 
-	printf 'Router      : %s\n' "$ROUTER_BACKEND_PRETTY"
-	printf 'Backend id  : %s\n' "$ROUTER_BACKEND"
-	printf 'Source      : %s\n' "$(router_source)"
-	printf 'State       : %s\n' "$(router_state)"
-	printf 'HTTP proxy  : %s\n' "$(router_http_proxy)"
-	printf 'SOCKS proxy : %s\n' "$(router_socks_proxy)"
-	printf 'Console     : %s\n' "$(router_console_url)"
+	router_t status.language "$I2PD_BROWSER_LANGUAGE"
+	router_t status.router "$ROUTER_BACKEND_PRETTY"
+	router_t status.backend "$ROUTER_BACKEND"
+	router_t status.source "$(router_source)"
+	router_t status.state "$(router_state)"
+	router_t status.http-proxy "$(router_http_proxy)"
+	router_t status.socks-proxy "$(router_socks_proxy)"
+	router_t status.console "$(router_console_url)"
 }
 
 cmd_console() {
@@ -421,13 +455,23 @@ cmd_detect() {
 			printf '%-9s %-14s %s\n' \
 				"$name" "$(router_state)" "$(router_console_url)"
 		else
-			printf '%-9s %s\n' "$name" "unavailable"
+			printf '%-9s %s\n' "$name" "$(router_t state.unavailable)"
 		fi
 	done
 }
 
 main() {
 	parse_args "$@"
+	if [[ -n $option_language ]]; then
+		if ! i18n_init "$option_language"; then
+			router_error "$(router_t language.invalid "$option_language")"
+			exit 2
+		fi
+	fi
+	if ((show_help == 1)); then
+		usage
+		exit 0
+	fi
 
 	case "$subcommand" in
 	install) cmd_install ;;

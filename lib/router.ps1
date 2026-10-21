@@ -18,6 +18,8 @@ if (-not $script:I2PD_BROWSER_ROOT) {
         Resolve-Path (Join-Path $PSScriptRoot '..')
     ).Path
 }
+. (Join-Path $script:I2PD_BROWSER_ROOT 'lib/i18n.ps1')
+[void](Initialize-I2pdBrowserI18n)
 
 $script:I2P_ROUTER_DEFAULT = if ($env:I2P_ROUTER_DEFAULT) {
     $env:I2P_ROUTER_DEFAULT
@@ -167,26 +169,40 @@ function Get-RouterConfSource {
     return (Get-RouterConfValue 'I2P_ROUTER_SOURCE')
 }
 
+function Get-RouterConfLanguage {
+    return (Get-RouterConfValue 'I2PD_BROWSER_LANGUAGE')
+}
+
 function Set-RouterConf {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
-        [string]$Source = ''
+        [string]$Source = '',
+        [string]$Language = $script:I2pdBrowserLanguage
     )
     if (-not (Assert-RouterBackend $Name)) { return $false }
     if (-not $Source) { $Source = Get-RouterConfSource }
     if (-not $Source) { $Source = $script:I2P_ROUTER_SOURCE_DEFAULT }
     if (-not (Assert-RouterSource $Source)) { return $false }
+    $Language = ConvertTo-I2pdBrowserLocale $Language
+    if (-not $Language) { return $false }
 
     $file = Get-RouterConfFile
-    $lines = @(
-        '# I2Pd Browser configuration'
-        '# Selected I2P router backend and source. Change them with:'
-        '#   ./install.ps1 configure --i2p-router=<i2pd|i2p-java>'
-        '#   ./install.ps1 configure --router-source=<system|vendored>'
+    $lines = if (Test-Path $file) {
+        Get-Content -Path $file | Where-Object {
+            $_ -notmatch '^\s*I2P_ROUTER\s*=' -and
+            $_ -notmatch '^\s*I2P_ROUTER_SOURCE\s*=' -and
+            $_ -notmatch '^\s*I2PD_BROWSER_LANGUAGE\s*='
+        }
+    } else {
+        @('# I2Pd Browser configuration')
+    }
+    $lines += @(
         "I2P_ROUTER=$Name"
         "I2P_ROUTER_SOURCE=$Source"
+        "I2PD_BROWSER_LANGUAGE=$Language"
     )
-    Set-Content -Path $file -Value $lines -Encoding ascii
+    $utf8 = New-Object Text.UTF8Encoding $false
+    [IO.File]::WriteAllLines($file, $lines, $utf8)
     return $true
 }
 

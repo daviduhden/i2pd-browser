@@ -30,6 +30,9 @@ installations.
 
 ## Features
 
+- **Languages**: The installer, router manager, Firefox ESR build
+  messages and launchers support English (`en-US`), Spanish (`es-ES`),
+  Russian (`ru`) and Simplified Chinese (`zh-CN`).
 - **Choice of I2P router**: `i2pd` (C++) or I2P (Java), selected once
   during installation and stored for later commands.
 - **Auto-detecting system architecture**: The builder configures
@@ -147,6 +150,11 @@ package builds:
 ./install.bash --i2p-router=i2pd
 ./install.bash --i2p-router=i2p-java
 
+# Select the language explicitly (the same option works on Windows):
+./install.bash --language=es-ES --i2p-router=i2pd
+./install.bash --language=ru --non-interactive
+./install.bash --language=zh-CN --no-browser
+
 # Use a managed copy of the latest stable router release instead of a
 # system installation:
 ./install.bash --i2p-router=i2pd --router-source=vendored
@@ -156,6 +164,7 @@ package builds:
 Additional options:
 
 - `--i2p-router=NAME`: select the backend (`i2pd` or `i2p-java`).
+- `--language=LANG`: select `en-US`, `es-ES`, `ru` or `zh-CN`.
 - `--router-source=SRC`: use the system install (`system`, default) or
   a managed copy downloaded by I2Pd Browser (`vendored`).
 - `--non-interactive`: never prompt; use the stored or default values.
@@ -202,6 +211,64 @@ When switching, the previously managed instance is stopped, the new
 backend configuration is generated, the selection is persisted and the
 new router is started and checked. Router data (keys, netDb, ...) is
 never migrated between backends; they are independent.
+
+## Language and localization
+
+The language is selected in this order: an explicit `--language`
+argument, the `I2PD_BROWSER_LANGUAGE` value in `i2pd-browser.conf`,
+the `I2PD_BROWSER_LANGUAGE` environment variable (the legacy
+`language` variable is also accepted for builder compatibility), the
+operating system UI locale, then English. Linux evaluates `LANGUAGE`
+(as an ordered colon-separated list), `LC_ALL`, `LC_MESSAGES` and
+`LANG`; Windows uses the .NET user UI culture. Unsupported system
+locales fall back to English. An explicitly supplied unsupported
+locale fails with an error.
+
+Use the same management command to persist a later change without
+changing the router, user profile, keys or router data:
+
+```sh
+./install.bash configure --language=en-US
+./install.bash configure --language=es-ES
+./install.bash configure --language=ru
+./install.bash configure --language=zh-CN
+```
+
+```powershell
+.\install.ps1 configure --language=en-US
+.\install.ps1 configure --language=es-ES
+.\install.ps1 configure --language=ru
+.\install.ps1 configure --language=zh-CN
+```
+
+On a first interactive install the language is requested before the
+router. Non-interactive invocations never prompt. The installer stores
+the normalized BCP 47 identifier alongside the existing router
+selection and preserves unrelated configuration lines.
+
+Firefox ESR is obtained from Mozilla's official localized ESR
+distribution for the selected language. The build verifies the exact
+locale path in Mozilla's `SHA512SUMS`, writes
+`intl.locale.requested` to the portable profile, and records the
+installed locale. A locale change rebuilds only when that marker does
+not match; it does not alter the hardened preferences, policies,
+proxies, NoScript, update settings or telemetry restrictions. The
+builder also accepts `--language=LANG` and retains the historical
+`language` environment variable.
+
+i2pd's console language is controlled by i2pd itself and is not
+overwritten. I2P Java's console has its own native localization and
+the project starts it with an isolated configuration directory; this
+project does not modify a system I2P installation's global language
+settings. Consequently, console localization is available only where
+the installed router version provides it.
+
+Translation catalogs live in `locales/*.properties`, use UTF-8, and
+are data only (they are never executed). Add a language by copying
+`en-US.properties`, preserving every key, using BCP 47 normalization
+in both `lib/i18n.bash` and `lib/i18n.ps1`, and extending
+`tests/test-i18n.bash` and `tests/test-i18n.ps1`. Missing keys fall
+back to English; catalog parity is checked by the tests.
 
 ## Windows
 

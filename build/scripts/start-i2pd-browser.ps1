@@ -14,6 +14,13 @@ $ErrorActionPreference = 'Stop'
 
 $script:BrowserDir = (Resolve-Path $PSScriptRoot).Path
 $script:Firefox = Join-Path $script:BrowserDir 'firefox.exe'
+. (Join-Path $script:BrowserDir 'i18n.ps1')
+$script:I2PD_BROWSER_ROOT = $script:BrowserDir
+$marker = Join-Path $script:BrowserDir '.i2pd-browser-locale'
+$locale = if (Test-Path $marker) {
+    (Get-Content $marker -Raw).Trim()
+} else { 'en-US' }
+[void](Initialize-I2pdBrowserI18n $locale)
 $script:ShowOutput = $false
 $script:Detach = $false
 $script:ShowUsage = $false
@@ -21,14 +28,7 @@ $script:LogOutput = $false
 $script:LogFile = $null
 
 function Show-BrowserUsage {
-    @'
-I2Pd Browser script options
-
-  --verbose, -v     Display Firefox output in the terminal
-  --log [file]      Record Firefox output to file (default: i2pd-browser.log)
-  --detach          Run I2Pd Browser in the background
-  -h, --help        Show this help
-'@ | Write-Host
+    Get-I18nMessage 'launcher.usage' | Write-Host
 }
 
 function Import-BrowserArgs {
@@ -73,7 +73,7 @@ function Import-BrowserArgs {
 function Start-Firefox {
     param([string[]]$FirefoxArgs)
     if (-not (Test-Path $script:Firefox)) {
-        Write-Error "Firefox was not found at $script:Firefox."
+        Write-Error (Get-I18nMessage 'error.browser-missing' @($script:Firefox))
         exit 1
     }
 
