@@ -11,8 +11,9 @@
 set -Eeuo pipefail
 
 _launcher_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck disable=SC2034
 I2PD_BROWSER_ROOT="$_launcher_dir"
-# shellcheck source=../../lib/i18n.bash
+# shellcheck disable=SC1091
 source "$_launcher_dir/i18n.bash"
 _launcher_locale="$(cat "$_launcher_dir/.i2pd-browser-locale" 2>/dev/null ||
 	printf 'en-US')"

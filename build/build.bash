@@ -13,7 +13,7 @@
 set -Eeuo pipefail
 
 I2PD_BROWSER_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-# shellcheck source=../lib/i18n.bash
+# shellcheck disable=SC1091
 source "$I2PD_BROWSER_ROOT/lib/i18n.bash"
 i18n_init
 
