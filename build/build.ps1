@@ -16,7 +16,10 @@ $ErrorActionPreference = 'Stop'
 
 $script:BuildDir = (Resolve-Path $PSScriptRoot).Path
 $script:RepoRoot = (Resolve-Path (Join-Path $script:BuildDir '..')).Path
-$script:BrowserDir = Join-Path $script:RepoRoot 'browser'
+$script:FinalBrowserDir = Join-Path $script:RepoRoot 'browser'
+# Build into a staging directory and publish only after every step
+# succeeds, so a failed build never removes a working browser.
+$script:BrowserDir = Join-Path $script:RepoRoot '.browser-build'
 $script:I2PD_BROWSER_ROOT = $script:RepoRoot
 . (Join-Path $script:RepoRoot 'lib/i18n.ps1')
 [void](Initialize-I2pdBrowserI18n)
@@ -59,8 +62,8 @@ function Import-BuildArgs {
             $index++
         }
         elseif ($argument -in @('-h', '--help')) {
-            Get-I18nMessage 'usage.header' @('./build.ps1') | Write-Host
-            Get-I18nMessage 'usage.options' | Write-Host
+            Get-I18nMessage 'usage.build-header' @('./build.ps1') | Write-Host
+            Get-I18nMessage 'usage.build-options' | Write-Host
             exit 0
         }
         else {
@@ -104,6 +107,15 @@ function Resolve-FirefoxDownload {
         $final = $base.RequestMessage.RequestUri.AbsoluteUri
     }
     if (-not $final) { Stop-Build 'Could not resolve the download URL.' }
+
+    # A redirect to a fallback locale would pass a checksum check but
+    # leave the bundle in the wrong language. Reject it explicitly.
+    $decoded = [Uri]::UnescapeDataString($final)
+    $localePattern = '/' + [regex]::Escape($script:Language) + '/'
+    if ($decoded -notmatch $localePattern) {
+        Stop-Build (Get-I18nMessage 'error.invalid-locale-build' @(
+                $script:Language))
+    }
     return $final
 }
 
@@ -195,6 +207,21 @@ function Install-Firefox {
     Remove-Item -Recurse -Force $tmp
     $data = Join-Path $script:BrowserDir 'data'
     New-Item -ItemType Directory -Force -Path $data | Out-Null
+
+    # Keep the portable profile across rebuilds. Without this, a
+    # language change or a rebuild would delete bookmarks, history,
+    # cookies, logins and extensions stored in browser/data.
+    $oldData = Join-Path $script:FinalBrowserDir 'data'
+    if (Test-Path $oldData) {
+        Get-ChildItem -Path $oldData -Force | Copy-Item `
+            -Destination $data -Recurse -Force
+        # Stale profile locks must not make the new bundle look as if
+        # it is already in use.
+        foreach ($lock in @('.parentlock', 'parent.lock', 'lock')) {
+            $lockPath = Join-Path $data $lock
+            if (Test-Path $lockPath) { Remove-Item -Force $lockPath }
+        }
+    }
 }
 
 function Remove-UnneededFiles {
@@ -210,8 +237,13 @@ function Remove-UnneededFiles {
         'removed-files'
         'updater.exe'
         'updater.ini'
+        'update-settings.ini'
+        'updates'
         'uninstall'
         'uninstall.exe'
+        'maintenanceservice.exe'
+        'maintenanceservice_installer.exe'
+        'default-browser-agent.exe'
         'Throbber-small.gif'
         'browser\crashreporter-override.ini'
         'browser\features\formautofill@mozilla.org.xpi'
@@ -229,12 +261,13 @@ function Remove-UnneededFiles {
 function Update-Configs {
     Write-BuildLog (Get-I18nMessage 'info.build.configuring')
     $ini = Join-Path $script:BrowserDir 'application.ini'
-    if (Test-Path $ini) {
-        (Get-Content $ini) `
-            -replace 'Enabled=1', 'Enabled=0' `
-            -replace 'ServerURL=.*', 'ServerURL=-' |
-            Set-Content $ini -Encoding ascii
+    if (-not (Test-Path $ini)) {
+        Stop-Build 'Firefox application.ini is missing.'
     }
+    (Get-Content $ini) `
+        -replace 'Enabled=1', 'Enabled=0' `
+        -replace 'ServerURL=.*', 'ServerURL=-' |
+        Set-Content $ini -Encoding ascii
 }
 
 function Install-NoScript {
@@ -246,6 +279,14 @@ function Install-NoScript {
     Invoke-WebRequest -Uri (
         'https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi'
     ) -OutFile $target -UseBasicParsing
+
+    # AMO can return an HTML error page with a successful HTTP status.
+    # An XPI is a ZIP file, so require the ZIP magic before publishing.
+    $bytes = [IO.File]::ReadAllBytes($target)
+    if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4B) {
+        Remove-Item -Force $target
+        Stop-Build 'NoScript download is not a valid XPI.'
+    }
 }
 
 function Format-PoliciesJson {
@@ -253,7 +294,15 @@ function Format-PoliciesJson {
     # never rewritten (ConvertTo-Json escapes differently from jq).
     $policies = Join-Path $script:BrowserDir 'distribution\policies.json'
     Write-BuildLog (Get-I18nMessage 'info.build.configuring')
-    $data = Get-Content $policies -Raw | ConvertFrom-Json
+    if (-not (Test-Path $policies)) {
+        Stop-Build 'Firefox policies.json is missing.'
+    }
+    try {
+        $data = Get-Content $policies -Raw | ConvertFrom-Json
+    }
+    catch {
+        Stop-Build "Could not parse $policies."
+    }
     $json = $data | ConvertTo-Json -Depth 100
     # Write UTF-8 without a BOM: Windows PowerShell 5.1 adds one with
     # Set-Content -Encoding utf8.
@@ -289,14 +338,90 @@ function Copy-LaunchScripts {
     Write-BuildLog (Get-I18nMessage 'info.build.launchers')
     Copy-Item -Recurse -Force `
         (Join-Path $script:BuildDir 'scripts\*') $script:BrowserDir
+    # Both launchers are shipped in the bundle so a copy remains
+    # usable when moved between platforms.
     Copy-Item -Force (Join-Path $script:RepoRoot 'lib\i18n.ps1') `
+        $script:BrowserDir
+    Copy-Item -Force (Join-Path $script:RepoRoot 'lib\i18n.bash') `
         $script:BrowserDir
     Copy-Item -Recurse -Force (Join-Path $script:RepoRoot 'locales') `
         $script:BrowserDir
 }
 
+function Test-BundleLayout {
+    $required = @(
+        'application.ini'
+        'i2pd-browser.cfg'
+        'defaults\pref\autoconfig.js'
+        'distribution\policies.json'
+        'browser\override.ini'
+        'data\user.js'
+        '.i2pd-browser-locale'
+        'start-i2pd-browser.bash'
+        'start-i2pd-browser.ps1'
+        'i18n.bash'
+        'i18n.ps1'
+        'locales\en-US.properties'
+    )
+    $missing = @()
+    foreach ($item in $required) {
+        if (-not (Test-Path (Join-Path $script:BrowserDir $item))) {
+            $missing += $item
+        }
+    }
+    if ($missing.Count -gt 0) {
+        Stop-Build (Get-I18nMessage 'error.bundle-validation' @(
+                ($missing -join ', ')))
+    }
+
+    # The proxy endpoint lives only in policies.json. Refuse to publish
+    # a bundle that could run Firefox in manual proxy mode without it.
+    $policies = Get-Content (
+        Join-Path $script:BrowserDir 'distribution\policies.json'
+    ) -Raw | ConvertFrom-Json
+    $proxy = $policies.policies.Proxy
+    if ($proxy.Mode -ne 'manual' -or $proxy.Locked -ne $true -or
+        $proxy.HTTPProxy -ne '127.0.0.1:4444' -or
+        $proxy.SSLProxy -ne '127.0.0.1:4444' -or
+        $proxy.UseProxyForDNS -ne $true -or $proxy.Passthrough -ne '') {
+        Stop-Build (Get-I18nMessage 'error.bundle-validation' @(
+                'Proxy policy'))
+    }
+}
+
+function Publish-Browser {
+    $backup = Join-Path $script:RepoRoot '.browser-old'
+    if (Test-Path $script:FinalBrowserDir) {
+        if (Test-Path $backup) {
+            Remove-Item -Recurse -Force $backup
+        }
+        Move-Item -Path $script:FinalBrowserDir -Destination $backup `
+            -ErrorAction Stop
+    }
+    try {
+        Move-Item -Path $script:BrowserDir `
+            -Destination $script:FinalBrowserDir -ErrorAction Stop
+    }
+    catch {
+        if (Test-Path $backup) {
+            Move-Item -Path $backup -Destination $script:FinalBrowserDir `
+                -ErrorAction SilentlyContinue
+        }
+        throw
+    }
+    if (Test-Path $backup) {
+        Remove-Item -Recurse -Force $backup
+    }
+}
+
 function Main {
     Import-BuildArgs -Arguments $args
+
+    if ($script:EsrProduct -notmatch '^[A-Za-z0-9._-]+$') {
+        Stop-Build (Get-I18nMessage 'error.invalid-product' @(
+                $script:EsrProduct))
+    }
+
     $url = Resolve-FirefoxDownload
     $version = Get-FirefoxVersion -Url $url
     Write-BuildLog (Get-I18nMessage 'info.build.preparing' @($version))
@@ -305,14 +430,16 @@ function Main {
     Update-Configs
     Install-NoScript
     Copy-StandardConfigs
-    Set-FirefoxLocale
     Format-PoliciesJson
     Copy-LaunchScripts
+    Set-FirefoxLocale
+    Test-BundleLayout
+    Publish-Browser
     Write-BuildLog (Get-I18nMessage 'info.build.complete')
 }
 
 # Router helpers used above are defined in lib/router.ps1.
 . (Join-Path $script:RepoRoot 'lib/router.ps1')
 
-Main
+Main @args
 exit 0

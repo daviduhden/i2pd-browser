@@ -234,12 +234,32 @@ ensure_backend_available() {
 	return 1
 }
 
+build_inputs_newer() {
+	local marker="$I2PD_BROWSER_ROOT/browser/.i2pd-browser-locale"
+	local newer
+
+	[[ -r $marker ]] || return 1
+	newer="$(find "$I2PD_BROWSER_ROOT/build" \
+		"$I2PD_BROWSER_ROOT/lib/i18n.bash" \
+		"$I2PD_BROWSER_ROOT/lib/i18n.ps1" \
+		"$I2PD_BROWSER_ROOT/locales" \
+		-type f \
+		! -path "$I2PD_BROWSER_ROOT/build/firefox/*" \
+		! -name 'SHA512SUMS' \
+		! -name 'firefox-*.tar.*' \
+		-newer "$marker" -print -quit 2>/dev/null)"
+	[[ -n $newer ]]
+}
+
 build_browser_if_needed() {
 	local locale_file="$I2PD_BROWSER_ROOT/browser/.i2pd-browser-locale"
 	if [[ -x "$I2PD_BROWSER_ROOT/browser/firefox" ]] &&
 		[[ -r $locale_file ]] &&
 		[[ $(<"$locale_file") == "$I2PD_BROWSER_LANGUAGE" ]]; then
 		router_log "$(router_t info.bundle-built)"
+		if build_inputs_newer; then
+			router_warn "$(router_t warn.build-inputs-newer)"
+		fi
 		return 0
 	fi
 	router_log "$(router_t info.building)"
@@ -314,13 +334,16 @@ cmd_install() {
 	i18n_init "$selected_language"
 	backend="$(choose_backend "$option_router")" || exit 1
 	source="$(choose_source "$option_source")" || exit 1
-	router_conf_set "$backend" "$source" "$selected_language" || exit 1
+
+	# Do not persist a new selection until the requested backend is
+	# actually available and its configuration can be prepared.
+	ROUTER_SOURCE="$source"
 	router_load_backend "$backend" || exit 1
-
-	router_log "$(router_t status.selected-router "$ROUTER_BACKEND_PRETTY" "$source")"
-
 	ensure_backend_available || exit 1
 	router_prepare_config || exit 1
+	router_conf_set "$backend" "$source" "$selected_language" || exit 1
+
+	router_log "$(router_t status.selected-router "$ROUTER_BACKEND_PRETTY" "$source")"
 
 	if ((no_browser == 0)); then
 		build_browser_if_needed || exit 1
@@ -355,6 +378,14 @@ cmd_configure() {
 	fi
 	router_require_valid_source "$source" || exit 1
 
+	# Validate and prepare the new backend before stopping the old one.
+	# A missing dependency must not leave the user without a router or
+	# persist a selection that cannot work.
+	ROUTER_SOURCE="$source"
+	router_load_backend "$backend" || exit 1
+	ensure_backend_available || exit 1
+	router_prepare_config || exit 1
+
 	if [[ -n $current ]] && router_is_valid_backend "$current" &&
 		{ [[ $current != "$backend" ]] || [[ $current_source != "$source" ]]; }; then
 		current_pretty="$(router_backend_pretty "$current")"
@@ -384,8 +415,6 @@ cmd_configure() {
 	router_load_backend "$backend" || exit 1
 	router_log "$(router_t status.selected-router "$ROUTER_BACKEND_PRETTY" "$source")"
 
-	ensure_backend_available || exit 1
-	router_prepare_config || exit 1
 	if ((no_browser == 0)); then
 		build_browser_if_needed || exit 1
 	fi
@@ -462,15 +491,20 @@ cmd_detect() {
 
 main() {
 	parse_args "$@"
+	if ((show_help == 1)); then
+		# Show help in the requested language when it is valid, but
+		# never reject --help because of a bad --language value.
+		if [[ -n $option_language ]]; then
+			i18n_init "$option_language" || true
+		fi
+		usage
+		exit 0
+	fi
 	if [[ -n $option_language ]]; then
 		if ! i18n_init "$option_language"; then
 			router_error "$(router_t language.invalid "$option_language")"
 			exit 2
 		fi
-	fi
-	if ((show_help == 1)); then
-		usage
-		exit 0
 	fi
 
 	case "$subcommand" in

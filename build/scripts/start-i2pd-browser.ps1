@@ -77,7 +77,10 @@ function Start-Firefox {
         exit 1
     }
 
-    $arguments = @('-profile', 'data') + $FirefoxArgs
+    # Use an absolute profile path: the launcher may be invoked from any
+    # working directory, including by double-clicking the .cmd shim.
+    $profileDir = Join-Path $script:BrowserDir 'data'
+    $arguments = @('-profile', $profileDir) + $FirefoxArgs
 
     # If --log points at an existing directory, keep the default file
     # name inside it instead of failing to write to a directory.
@@ -87,13 +90,17 @@ function Start-Firefox {
     }
 
     if ($script:ShowUsage) {
-        & $script:Firefox -profile data --help
+        & $script:Firefox -profile $profileDir --help
         Show-BrowserUsage
         return
     }
 
     if ($script:Detach) {
-        Start-Process -FilePath $script:Firefox -ArgumentList $arguments `
+        # Start-Process joins its argument array with spaces without
+        # adding quotes, so quote a profile path that contains spaces.
+        $startArguments = @('-profile', "`"$profileDir`"") + $FirefoxArgs
+        Start-Process -FilePath $script:Firefox `
+            -ArgumentList $startArguments `
             -WorkingDirectory $script:BrowserDir | Out-Null
         return
     }

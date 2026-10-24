@@ -1,6 +1,14 @@
 /browser
+/.browser-build/
+/.browser-old/
 /start-i2pd-browser.desktop
 /i2pd-browser.conf
+/i2pd-browser.log
+
+# Transient build downloads and extraction directories.
+/build/firefox/
+/build/firefox-*.tar.*
+/build/SHA512SUMS
 
 # i2pd runtime state (configuration is committed, state is not).
 /i2pd/netDb/

@@ -134,6 +134,12 @@ copy of the latest stable router release into `vendor/` with
 	./build.bash
 	```
 
+	The builder stages the new bundle and publishes it only after the
+	layout and proxy policy validate. Rebuilding preserves
+	`browser/data/`, so bookmarks, history, cookies, logins and
+	extensions survive; remove that directory explicitly if you want a
+	clean profile.
+
 4. Start the browser with the desktop entry:
 
 	```sh
@@ -248,13 +254,15 @@ selection and preserves unrelated configuration lines.
 
 Firefox ESR is obtained from Mozilla's official localized ESR
 distribution for the selected language. The build verifies the exact
-locale path in Mozilla's `SHA512SUMS`, writes
+locale path in Mozilla's `SHA512SUMS`, rejects a final download URL
+whose locale does not match the request, writes
 `intl.locale.requested` to the portable profile, and records the
-installed locale. A locale change rebuilds only when that marker does
+locale. A locale change rebuilds only when that marker does
 not match; it does not alter the hardened preferences, policies,
-proxies, NoScript, update settings or telemetry restrictions. The
-builder also accepts `--language=LANG` and retains the historical
-`language` environment variable.
+proxies, update settings or telemetry restrictions. A rebuild may
+refresh the NoScript download. The builder also accepts
+`--language=LANG` and retains the historical `language` environment
+variable.
 
 i2pd's console language is controlled by i2pd itself and is not
 overwritten. I2P Java's console has its own native localization and
@@ -295,7 +303,8 @@ powershell -ExecutionPolicy Bypass -File i2p-java/i2p-java.ps1
 
 On Windows the router is started as a hidden background process and a
 PID file is used instead of `screen`. The Firefox bundle is built with
-`build/build.ps1` and launched with
+`build/build.ps1` or the `build\build.cmd` shim, for example
+`build\build.cmd --language=en-US`, and launched with
 `build/scripts/start-i2pd-browser.ps1`.
 
 Because Windows Defender has repeatedly flagged i2pd builds as malware
@@ -378,6 +387,9 @@ connection: `network.proxy.failover_direct` is locked to `false`.
   (for example `screen`, or `java` for the Java backend).
 - **Wrong backend selected.** Change it with
   `./install.bash configure --i2p-router=<i2pd|i2p-java>`.
+- **Browser changes do not appear.** The installer warns when build
+  inputs are newer than the bundle; rebuild explicitly with
+  `cd build && ./build.bash` (or `build\build.cmd` on Windows).
 
 ## Licensing
 

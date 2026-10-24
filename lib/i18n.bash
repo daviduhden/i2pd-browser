@@ -28,7 +28,8 @@ i18n_stored_locale() {
 	file="$(i18n_config_file)"
 	[[ -r $file ]] || return 0
 	sed -n 's/^[[:space:]]*I2PD_BROWSER_LANGUAGE[[:space:]]*=[[:space:]]*//p' \
-		"$file" | tr -d '\r' | tail -n 1
+		"$file" | tr -d '\r' |
+		sed 's/[[:space:]]*$//' | tail -n 1
 }
 
 i18n_system_locale() {
@@ -73,6 +74,9 @@ i18n_load_catalog() {
 		[[ -r $catalog ]] || continue
 		while IFS='=' read -r key value || [[ -n $key ]]; do
 			[[ -n $key && ${key:0:1} != '#' && $key != *' '* ]] || continue
+			# Tolerate a CRLF checkout even though .gitattributes
+			# pins catalogs to LF.
+			value="${value%$'\r'}"
 			I18N_MESSAGES["$key"]="$value"
 		done <"$catalog"
 	done

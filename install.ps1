@@ -189,6 +189,36 @@ function Confirm-BackendAvailable {
     return $false
 }
 
+function Test-BuildInputsNewer {
+    $marker = Join-Path $script:I2PD_BROWSER_ROOT `
+        'browser/.i2pd-browser-locale'
+    if (-not (Test-Path $marker)) { return $false }
+
+    $paths = @(
+        (Join-Path $script:I2PD_BROWSER_ROOT 'build/preferences')
+        (Join-Path $script:I2PD_BROWSER_ROOT 'build/profile')
+        (Join-Path $script:I2PD_BROWSER_ROOT 'build/scripts')
+        (Join-Path $script:I2PD_BROWSER_ROOT 'build/build.bash')
+        (Join-Path $script:I2PD_BROWSER_ROOT 'build/build.ps1')
+        (Join-Path $script:I2PD_BROWSER_ROOT 'lib/i18n.bash')
+        (Join-Path $script:I2PD_BROWSER_ROOT 'lib/i18n.ps1')
+        (Join-Path $script:I2PD_BROWSER_ROOT 'locales')
+    )
+    $markerTime = (Get-Item $marker).LastWriteTime
+    foreach ($path in $paths) {
+        if (-not (Test-Path $path)) { continue }
+        $files = if (Test-Path $path -PathType Container) {
+            Get-ChildItem -Path $path -Recurse -File
+        }
+        else { Get-Item $path }
+        if ($files | Where-Object { $_.LastWriteTime -gt $markerTime } |
+            Select-Object -First 1) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Build-BrowserIfNeeded {
     $firefox = Join-Path $script:I2PD_BROWSER_ROOT 'browser/firefox.exe'
     $localeFile = Join-Path $script:I2PD_BROWSER_ROOT 'browser/.i2pd-browser-locale'
@@ -196,6 +226,9 @@ function Build-BrowserIfNeeded {
         ((Get-Content $localeFile -Raw).Trim() -eq
             $script:I2pdBrowserLanguage)) {
         Write-RouterLog 'The Firefox ESR bundle is already built.'
+        if (Test-BuildInputsNewer) {
+            Write-RouterWarn (Get-I18nMessage 'warn.build-inputs-newer')
+        }
         return $true
     }
     Write-RouterLog 'Building the Firefox ESR bundle...'
@@ -212,7 +245,13 @@ function Test-BrowserProxy {
         Write-RouterWarn 'No built browser configuration to validate.'
         return $true
     }
-    $config = Get-Content $policies -Raw | ConvertFrom-Json
+    try {
+        $config = Get-Content $policies -Raw | ConvertFrom-Json
+    }
+    catch {
+        Write-RouterWarn "Could not parse the built Firefox policies at $policies."
+        return $false
+    }
     $got = $config.policies.Proxy.HTTPProxy
     if ($got -and $got -ne $expected) {
         Write-RouterWarn "The Firefox proxy ($got) does not match the selected router proxy ($expected); rebuild the browser."
@@ -259,13 +298,15 @@ function Invoke-Install {
     $source = Select-SourceName -Requested $script:OptionSource
     if (-not $source) { exit 1 }
 
-    if (-not (Set-RouterConf -Name $backend -Source $source -Language $locale)) { exit 1 }
+    # Do not persist a new selection until the requested backend is
+    # actually available and its configuration can be prepared.
+    $script:ROUTER_SOURCE = $source
     if (-not (Import-RouterBackend $backend)) { exit 1 }
-
-    Write-RouterLog "Selected router: $script:ROUTER_BACKEND_PRETTY ($source)"
-
     if (-not (Confirm-BackendAvailable)) { exit 1 }
     if (-not (Invoke-RouterPrepareConfig)) { exit 1 }
+    if (-not (Set-RouterConf -Name $backend -Source $source -Language $locale)) { exit 1 }
+
+    Write-RouterLog "Selected router: $script:ROUTER_BACKEND_PRETTY ($source)"
 
     if (-not $script:NoBrowser) {
         if (-not (Build-BrowserIfNeeded)) { exit 1 }
@@ -289,6 +330,14 @@ function Invoke-Configure {
     if (-not $source -and $currentSource) { $source = $currentSource }
     if (-not $source) { $source = $script:I2P_ROUTER_SOURCE_DEFAULT }
     if (-not (Assert-RouterSource $source)) { exit 1 }
+
+    # Validate and prepare the new backend before stopping the old one.
+    # A missing dependency must not leave the user without a router or
+    # persist a selection that cannot work.
+    $script:ROUTER_SOURCE = $source
+    if (-not (Import-RouterBackend $backend)) { exit 1 }
+    if (-not (Confirm-BackendAvailable)) { exit 1 }
+    if (-not (Invoke-RouterPrepareConfig)) { exit 1 }
 
     if ($current -and (Test-RouterBackend $current) -and
         ($current -ne $backend -or $currentSource -ne $source)) {
@@ -317,8 +366,6 @@ function Invoke-Configure {
     if (-not (Import-RouterBackend $backend)) { exit 1 }
     Write-RouterLog "Selected router: $script:ROUTER_BACKEND_PRETTY ($source)"
 
-    if (-not (Confirm-BackendAvailable)) { exit 1 }
-    if (-not (Invoke-RouterPrepareConfig)) { exit 1 }
     if (-not $script:NoBrowser) {
         if (-not (Build-BrowserIfNeeded)) { exit 1 }
     }
@@ -386,6 +433,15 @@ function Invoke-DetectCommand {
 }
 
 Import-Args -Arguments $args
+if ($script:ShowHelp) {
+    # Show help in the requested language when it is valid, but never
+    # reject --help because of a bad --language value.
+    if ($script:OptionLanguage) {
+        [void](Initialize-I2pdBrowserI18n $script:OptionLanguage)
+    }
+    Show-Usage
+    exit 0
+}
 if ($script:OptionLanguage) {
     if (-not (Initialize-I2pdBrowserI18n $script:OptionLanguage)) {
         Write-RouterError (
@@ -393,10 +449,6 @@ if ($script:OptionLanguage) {
         )
         exit 2
     }
-}
-if ($script:ShowHelp) {
-    Show-Usage
-    exit 0
 }
 switch ($script:Subcommand) {
     'install' { Invoke-Install }

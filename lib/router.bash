@@ -138,7 +138,8 @@ router_conf_get() {
 	if [[ -r $file ]]; then
 		sed -n \
 			's/^[[:space:]]*I2P_ROUTER[[:space:]]*=[[:space:]]*//p' \
-			"$file" | tr -d '\r' | tail -n 1
+			"$file" | tr -d '\r' |
+			sed 's/[[:space:]]*$//' | tail -n 1
 	fi
 }
 
@@ -149,7 +150,8 @@ router_conf_get_source() {
 	if [[ -r $file ]]; then
 		sed -n \
 			's/^[[:space:]]*I2P_ROUTER_SOURCE[[:space:]]*=[[:space:]]*//p' \
-			"$file" | tr -d '\r' | tail -n 1
+			"$file" | tr -d '\r' |
+			sed 's/[[:space:]]*$//' | tail -n 1
 	fi
 }
 
