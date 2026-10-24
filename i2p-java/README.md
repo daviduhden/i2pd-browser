@@ -4,8 +4,11 @@ This directory contains everything specific to the I2P (Java) router
 backend.
 
     config/   Vendored, versioned configuration (static files only).
-    data/     Effective configuration and runtime state. Generated on
-              first start and ignored by Git.
+    data/     Effective configuration and runtime state. Seeded from
+              config/ by the installer or launcher when a file is
+              missing, then ignored by Git. Existing files are never
+              overwritten; update data/ explicitly to apply a config
+              change to an existing installation.
 
 The `i2p-java.bash` launcher starts the system I2P installation directly
 with `-Di2p.dir.config=data`, so the router never touches the user's

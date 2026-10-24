@@ -175,8 +175,9 @@ i2p_java_installer_url() {
 
 	html="$(curl -fsSL "$(i2p_java_download_page)" 2>/dev/null ||
 		true)"
+	# Require HTTPS here; a plaintext installer URL must never be used.
 	href="$(printf '%s\n' "$html" |
-		grep -oE "https?://[^\"']*i2pinstall_${version//./\\.}\.jar" |
+		grep -oE "https://[^\"']*i2pinstall_${version//./\\.}\.jar" |
 		head -n 1)"
 	if [[ -z $href ]]; then
 		href="https://files.i2p.net/${version}"
@@ -211,6 +212,15 @@ backend_vendor_install() {
 	router_log "Downloading I2P (Java) $version"
 	if ! router_download "$url" "$installer"; then
 		router_error "Could not download $url"
+		return 1
+	fi
+	# The upstream project does not publish a checksum at this URL.
+	# At minimum, reject an HTML error page masquerading as a JAR.
+	# This is not authenticity or signature verification.
+	if [[ ! -s $installer ]] ||
+		[[ $(head -c 2 "$installer") != "PK" ]]; then
+		rm -f "$installer"
+		router_error "Downloaded I2P installer is not a valid JAR."
 		return 1
 	fi
 
@@ -319,17 +329,27 @@ backend_prepare_config() {
 		return 1
 	fi
 
-	mkdir -p "$dst"
+	# The effective configuration and runtime state live in data/.
+	# Keep newly created files private even if the caller's umask is
+	# permissive.
+	if ! (
+		umask 077
 
-	while IFS= read -r -d '' file; do
-		rel="${file#"$src"/}"
-		mkdir -p "$dst/$(dirname "$rel")"
-		if [[ ! -e "$dst/$rel" ]]; then
-			cp "$file" "$dst/$rel"
-		fi
-	done < <(find "$src" -type f -print0)
+		mkdir -p "$dst"
 
-	mkdir -p "$dst/addressbook"
+		while IFS= read -r -d '' file; do
+			rel="${file#"$src"/}"
+			mkdir -p "$dst/$(dirname "$rel")"
+			if [[ ! -e "$dst/$rel" ]]; then
+				cp "$file" "$dst/$rel"
+			fi
+		done < <(find "$src" -type f -print0)
+
+		mkdir -p "$dst/addressbook"
+	); then
+		router_error "Could not prepare the I2P (Java) configuration."
+		return 1
+	fi
 	return 0
 }
 

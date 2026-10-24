@@ -147,9 +147,11 @@ function Install-BackendDependencies {
     if (Test-RouterCommand 'winget') {
         & winget install --id Microsoft.OpenJDK.21 `
             --accept-source-agreements --accept-package-agreements
+        $javaOk = ($LASTEXITCODE -eq 0)
         & winget install --id I2P.I2P `
             --accept-source-agreements --accept-package-agreements
-        return ($LASTEXITCODE -eq 0)
+        $i2pOk = ($LASTEXITCODE -eq 0)
+        return ($javaOk -and $i2pOk)
     }
     Write-RouterWarn 'winget was not found; install Java and I2P manually.'
     return $false
@@ -223,6 +225,16 @@ function Install-BackendVendor {
     $installer = Join-Path $dir "i2pinstall_$version.jar"
     Write-RouterLog "Downloading I2P (Java) $version"
     if (-not (Invoke-RouterDownload -Url $url -Destination $installer)) {
+        return $false
+    }
+
+    # The upstream project does not publish a checksum at this URL.
+    # At minimum, reject an HTML error page masquerading as a JAR.
+    # This is not authenticity or signature verification.
+    $bytes = [IO.File]::ReadAllBytes($installer)
+    if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4B) {
+        Remove-Item -Force $installer
+        Write-RouterError 'Downloaded I2P installer is not a valid JAR.'
         return $false
     }
 

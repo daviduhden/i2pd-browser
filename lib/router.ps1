@@ -155,7 +155,8 @@ function Get-RouterConfValue {
     param([string]$Key)
     $file = Get-RouterConfFile
     if (-not (Test-Path $file)) { return '' }
-    $match = Select-String -Path $file -Pattern "^$Key=(.*)$" |
+    $pattern = '^\s*' + [regex]::Escape($Key) + '\s*=\s*(.*)$'
+    $match = Select-String -Path $file -Pattern $pattern |
         Select-Object -Last 1
     if ($match) { return $match.Matches[0].Groups[1].Value.Trim() }
     return ''
@@ -202,7 +203,21 @@ function Set-RouterConf {
         "I2PD_BROWSER_LANGUAGE=$Language"
     )
     $utf8 = New-Object Text.UTF8Encoding $false
-    [IO.File]::WriteAllLines($file, $lines, $utf8)
+    $tmp = "$file.tmp.$PID"
+    try {
+        [IO.File]::WriteAllLines($tmp, $lines, $utf8)
+        if (Test-Path -LiteralPath $file) {
+            [IO.File]::Replace($tmp, $file, $null)
+        }
+        else {
+            [IO.File]::Move($tmp, $file)
+        }
+    }
+    catch {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        Write-RouterError "Could not write $file."
+        return $false
+    }
     return $true
 }
 
