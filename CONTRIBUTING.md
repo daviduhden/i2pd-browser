@@ -18,7 +18,7 @@ commands; create a skill only for a recurring workflow not covered by an existin
 one. If maintenance cannot be completed, the task is incomplete and the
 limitation must be reported.
 
-Run `python3 scripts/validate-agent-maintenance.py` before proposing a change.
+Run `python3 scripts/validate-agent-knowledge.py --scope worktree` before proposing a change.
 The GitHub Actions pull request check runs the same validator against the PR
 base. It detects changed project paths, requires a non-empty content addition
 to an agent instruction or skill, validates skill frontmatter and local Markdown

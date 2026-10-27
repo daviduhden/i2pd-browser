@@ -211,7 +211,7 @@ that could be mistaken for active configuration.
 | `build/scripts/execdesktop.bash` | Reads the custom `X-I2PdBrowser-ExecShell` field from the desktop entry and executes the stored launcher with forwarded arguments. |
 | `tests/test-i18n.bash`, `tests/test-i18n.ps1` | Exercise catalog parity, locale normalization/selection, configuration preservation, and builder locale preference wiring. The PowerShell test should be parsed/run only when `pwsh` is available. |
 | `tests/test-proxy-policy.bash` | Verifies that a non-default loopback HTTP endpoint replaces both generated Firefox HTTP and SSL policy endpoints while preserving the locked proxy controls. |
-| `scripts/validate-agent-maintenance.py` | Checks Git change coverage and structural synchronization of agent instructions/skills. It does not judge whether documentation changes are semantically sufficient. |
+| `scripts/validate-agent-knowledge.py` | Checks Git change coverage and structural synchronization of agent instructions/skills. It does not judge whether documentation changes are semantically sufficient. |
 
 ### Cross-file invariants
 
