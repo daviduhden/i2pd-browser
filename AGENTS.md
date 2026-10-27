@@ -74,6 +74,7 @@ shfmt -d install.bash build/build.bash build/scripts/*.bash \
   lib/*.bash lib/backends/*.bash tests/*.bash i2pd/*.bash \
   i2p-java/*.bash
 jq -e . build/preferences/distribution/policies.json
+python3 scripts/validate-agent-maintenance.py
 git diff --check
 ```
 
@@ -146,12 +147,75 @@ place rather than replacing it.
 
 See `localization-maintenance` for the full procedure.
 
+## Continuous Agent & Skills Maintenance
+
+This requirement applies to every agent and tool that changes this repository.
+
+> Agent instructions and skills are living repository artifacts.
+>
+> Every repository modification MUST include an agent/skills synchronization step.
+>
+> Before completing any task, inspect the applicable AGENTS.md and SKILL.md files, update the affected instructions, and validate their consistency with the implementation.
+>
+> A code change without the corresponding agent knowledge maintenance is considered incomplete.
+>
+> Never claim completion when the synchronization step has been skipped or has failed.
+
+After any repository modification (including code, configuration, dependencies,
+tests, workflows, or documentation), make one complete synchronization review:
+
+1. Inspect all applicable `AGENTS.md` files, tool-specific agent instructions,
+   and `.agents/skills/**/SKILL.md`, `.github/skills/**/SKILL.md`, and
+   `.claude/skills/**/SKILL.md` files. Also check repository instructions for
+   other agent tools, such as `.github/agents/*.agent.md` and Cursor rules.
+2. Map changed paths and behavior to the existing agents and skills by their
+   scope, triggers, procedures, validation commands, and references. Update
+   every affected instruction and any reusable finding that improves future
+   work; remove stale or contradictory details.
+3. Update an existing skill when its scope matches and its procedure, facts,
+   assumptions, examples, commands, or validation changed. Create a skill only
+   when recurring work has a distinct reusable workflow not covered by an
+   existing skill. Keep agent roles and skill scopes linked and non-duplicative.
+4. Keep each specialized agent's triggers, workflow, delegation/validation
+   expectations, and final report aligned with its related skills. Preserve
+   skill frontmatter and Agent Skills compatibility.
+5. Validate changed instruction files for readable Markdown, required
+   headings/frontmatter, and working repository-relative links. Run
+   `python3 scripts/validate-agent-maintenance.py` after synchronization.
+   The validator checks Git change coverage and structural consistency; human
+   review must still confirm that the update is semantically relevant.
+6. If synchronization or validation cannot be completed, fix it or report the
+   exact limitation and mark the task incomplete. Do not silently omit it.
+
+Avoid maintenance loops: perform one full review at the end of a task, and
+repeat only if that review finds an error that is corrected. Changes to this
+policy, an agent, or a skill require checking the complete instruction/skill
+system for consistency.
+
+### Mandatory Definition of Done
+
+- [ ] Repository changes implemented.
+- [ ] Relevant agent instructions reviewed.
+- [ ] Relevant skills reviewed.
+- [ ] Affected AGENTS.md / SKILL.md files updated.
+- [ ] Obsolete knowledge removed.
+- [ ] New reusable knowledge incorporated.
+- [ ] Agent and skill references validated.
+- [ ] Automated maintenance checks passed.
+- [ ] Final synchronization status reported.
+
+Every final report must contain **Agent & Skills Synchronization** and state
+agents reviewed, skills reviewed, instruction files updated, reusable knowledge
+added/corrected, validations actually run, and a final `PASS` or `FAIL` status.
+An unavailable check must be reported as not run, never as passed.
+
 ## Specialized skills
 
 Use these instead of re-deriving project details:
 
 | Skill | Use when |
 | --- | --- |
+| [agent-maintenance](.agents/skills/agent-maintenance/SKILL.md) | Changing repository agent instructions, skills, or maintenance enforcement. |
 | [firefox-esr-bundling](.agents/skills/firefox-esr-bundling/SKILL.md) | Changing the Firefox ESR download, extraction, profile, or bundle layout. |
 | [i2p-router-integration](.agents/skills/i2p-router-integration/SKILL.md) | Changing router detection, lifecycle, backend config, or vendored routers. |
 | [privacy-and-leak-audit](.agents/skills/privacy-and-leak-audit/SKILL.md) | Reviewing Firefox or router changes for clearnet leaks and weakened controls. |
