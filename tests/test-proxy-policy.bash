@@ -8,10 +8,15 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
+# These values are read by the router library loaded through the computed path.
+# shellcheck disable=SC2034
 ROUTER_HTTP_PROXY_HOST=127.0.0.1
+# shellcheck disable=SC2034
 ROUTER_HTTP_PROXY_PORT=15444
+# shellcheck disable=SC2034
 I2PD_BROWSER_ROOT="$root"
-# shellcheck source=lib/router.bash
+# ShellCheck cannot resolve this source path because it is computed at runtime.
+# shellcheck disable=SC1091
 source "$root/lib/router.bash"
 router_validate_proxy_settings
 
