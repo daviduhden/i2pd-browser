@@ -2,6 +2,9 @@
 
 # Shared, data-only localization support. Catalogs use UTF-8 key=value
 # records and are never sourced as shell code.
+# Selection precedence is explicit option, stored config, environment,
+# then OS locale; unsupported implicit values fall through to a supported
+# value or English, while an unsupported explicit value is an error.
 
 declare -A I18N_MESSAGES=()
 I2PD_BROWSER_LANGUAGE="${I2PD_BROWSER_LANGUAGE:-}"

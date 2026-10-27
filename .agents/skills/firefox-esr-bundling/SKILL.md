@@ -38,8 +38,11 @@ does not cover router selection or installer lifecycle; use
   `browser/` tree; never edit generated `browser/` files as the source.
 - `build/preferences/defaults/pref/autoconfig.js` enables
   `i2pd-browser.cfg`. That file contains the `lockPref`,
-  `defaultPref`, and `pref` hardening rules. The enterprise policy file
-  is `build/preferences/distribution/policies.json`.
+  `defaultPref`, and `pref` hardening rules. The enterprise policy template
+  is `build/preferences/distribution/policies.json`. Both builders replace
+  its HTTP and SSL proxy endpoints with the validated
+  `ROUTER_HTTP_PROXY_HOST` / `ROUTER_HTTP_PROXY_PORT` endpoint; the template
+  `127.0.0.1:4444` is only the default.
 - NoScript is downloaded from AMO's `latest.xpi` URL, written to
   `browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi`,
   and checked for the ZIP magic bytes. Its version and signature are
@@ -82,6 +85,7 @@ bash -n build/build.bash
 shellcheck build/build.bash
 shfmt -d build/build.bash
 jq -e . build/preferences/distribution/policies.json
+bash tests/test-proxy-policy.bash
 bash tests/test-i18n.bash
 git diff --check
 ```
@@ -111,7 +115,8 @@ they worked:
   requested locale.
 - `browser/.i2pd-browser-locale` contains that locale.
 - `browser/distribution/policies.json` parses and keeps the locked
-  manual proxy at `127.0.0.1:4444`.
+  locked manual proxy matching the selected router endpoint (default
+  `127.0.0.1:4444`).
 - `browser/defaults/pref/autoconfig.js`, `browser/i2pd-browser.cfg`,
   and `browser/browser/override.ini` exist.
 - `browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi`
@@ -161,6 +166,7 @@ change. Use a disposable clone or a backed-up profile.
 - `build/scripts/start-i2pd-browser.bash` - Linux launcher.
 - `build/scripts/start-i2pd-browser.ps1` - Windows launcher.
 - `README.md` - supported targets and user-facing build behavior.
+- `docs/configuration-and-source-map.md` - browser configuration layers and policy notes.
 - Related skills: `privacy-and-leak-audit`, `browser-build-validation`,
   `localization-maintenance`.
 

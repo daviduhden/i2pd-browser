@@ -10,13 +10,20 @@
 # extensions, and finally copies necessary scripts and
 # configurations for the I2Pd Browser.
 
+# Fail on unhandled command, unset-variable, and pipeline errors; the ERR trap
+# below reports the failing source line before the build exits.
 set -Eeuo pipefail
 
 I2PD_BROWSER_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck disable=SC1091
 source "$I2PD_BROWSER_ROOT/lib/i18n.bash"
 i18n_init
+# Reuse the same validated endpoint defaults as the installer and router
+# manager so the generated Firefox policy follows any loopback override.
+# shellcheck disable=SC1091
+source "$I2PD_BROWSER_ROOT/lib/router.bash"
 
+# With errtrace enabled, report failures from nested functions as well as main.
 trap 'error "Unhandled error at line $LINENO."' ERR
 
 # Helper functions
@@ -311,15 +318,21 @@ copy_standard_configs() {
 format_distribution_policy_json() {
 	local json_file="$staging_dir/distribution/policies.json"
 	local tmp_json_file="${json_file}.tmp"
+	local http_proxy
+	http_proxy="$(router_http_proxy)"
 
 	log "$(i18n_message info.build.configuring)"
-	jq . "$json_file" >"$tmp_json_file"
+	jq --arg endpoint "$http_proxy" \
+		'.policies.Proxy.HTTPProxy = $endpoint |
+		 .policies.Proxy.SSLProxy = $endpoint' \
+		"$json_file" >"$tmp_json_file"
 	cat "$tmp_json_file" >"$json_file"
 	rm -f "$tmp_json_file"
 }
 
 validate_bundle() {
-	local required
+	local required expected_proxy
+	expected_proxy="$(router_http_proxy)"
 	local -a required_files=(
 		application.ini
 		i2pd-browser.cfg
@@ -343,13 +356,14 @@ validate_bundle() {
 		die "$(i18n_message error.bundle-validation "${missing[*]}")"
 	fi
 
-	# The proxy endpoint lives only in policies.json. Refuse to publish
-	# a bundle that could run Firefox in manual proxy mode without it.
-	jq -e '
+	# The profile selects manual mode; the generated enterprise policy carries
+	# the endpoint. Refuse to publish if its HTTP/SSL endpoints differ from the
+	# router endpoint selected for this build.
+	jq --arg expected_proxy "$expected_proxy" -e '
 		.policies.Proxy.Mode == "manual" and
 		.policies.Proxy.Locked == true and
-		.policies.Proxy.HTTPProxy == "127.0.0.1:4444" and
-		.policies.Proxy.SSLProxy == "127.0.0.1:4444" and
+		.policies.Proxy.HTTPProxy == $expected_proxy and
+		.policies.Proxy.SSLProxy == $expected_proxy and
 		.policies.Proxy.UseProxyForDNS == true and
 		.policies.Proxy.Passthrough == ""
 	' "$staging_dir/distribution/policies.json" >/dev/null ||
@@ -384,6 +398,8 @@ publish_browser() {
 
 main() {
 	parse_args "$@"
+	router_validate_proxy_settings ||
+		die "Proxy overrides must use 127.0.0.1 and ports from 1 to 65535."
 	setup_workdir
 	check_tools
 	detect_arch

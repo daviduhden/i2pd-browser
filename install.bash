@@ -8,6 +8,8 @@
 # It selects and persists the I2P router backend (i2pd or I2P Java),
 # prepares its configuration and provides simple lifecycle commands.
 
+# Treat unset variables and failed pipeline components as errors; keep this
+# strict mode in mind when adding optional values or sourced helper commands.
 set -Eeuo pipefail
 
 _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &&
@@ -253,14 +255,23 @@ build_inputs_newer() {
 
 build_browser_if_needed() {
 	local locale_file="$I2PD_BROWSER_ROOT/browser/.i2pd-browser-locale"
+	local policies="$I2PD_BROWSER_ROOT/browser/distribution/policies.json"
+	local expected got_http got_ssl
+	expected="$(router_http_proxy)"
 	if [[ -x "$I2PD_BROWSER_ROOT/browser/firefox" ]] &&
 		[[ -r $locale_file ]] &&
-		[[ $(<"$locale_file") == "$I2PD_BROWSER_LANGUAGE" ]]; then
-		router_log "$(router_t info.bundle-built)"
-		if build_inputs_newer; then
-			router_warn "$(router_t warn.build-inputs-newer)"
+		[[ $(<"$locale_file") == "$I2PD_BROWSER_LANGUAGE" ]] &&
+		[[ -r $policies ]] && command -v jq >/dev/null 2>&1; then
+		got_http="$(jq -r '.policies.Proxy.HTTPProxy // empty' "$policies")"
+		got_ssl="$(jq -r '.policies.Proxy.SSLProxy // empty' "$policies")"
+		if [[ $got_http == "$expected" && $got_ssl == "$expected" ]]; then
+			router_log "$(router_t info.bundle-built)"
+			if build_inputs_newer; then
+				router_warn "$(router_t warn.build-inputs-newer)"
+			fi
+			return 0
 		fi
-		return 0
+		router_log "The existing Firefox proxy policy does not match the selected router endpoint; rebuilding."
 	fi
 	router_log "$(router_t info.building)"
 	(
@@ -271,7 +282,7 @@ build_browser_if_needed() {
 
 validate_browser_proxy() {
 	local policies="$I2PD_BROWSER_ROOT/browser"
-	local expected got
+	local expected got_http got_ssl
 
 	policies+="/distribution/policies.json"
 	expected="$(router_http_proxy)"
@@ -283,9 +294,10 @@ validate_browser_proxy() {
 	fi
 
 	if command -v jq >/dev/null 2>&1; then
-		got="$(jq -r '.policies.Proxy.HTTPProxy // empty' "$policies")"
-		if [[ -n $got && $got != "$expected" ]]; then
-			router_warn "The Firefox proxy ($got) does not match the" \
+		got_http="$(jq -r '.policies.Proxy.HTTPProxy // empty' "$policies")"
+		got_ssl="$(jq -r '.policies.Proxy.SSLProxy // empty' "$policies")"
+		if [[ $got_http != "$expected" || $got_ssl != "$expected" ]]; then
+			router_warn "The Firefox proxy ($got_http / $got_ssl) does not match the" \
 				"selected router proxy ($expected);" \
 				"rebuild the browser."
 			return 1
@@ -349,7 +361,7 @@ cmd_install() {
 		build_browser_if_needed || exit 1
 	fi
 
-	validate_browser_proxy || true
+	validate_browser_proxy || exit 1
 	wait_for_proxy_or_warn || exit 1
 	print_summary
 }
@@ -418,7 +430,7 @@ cmd_configure() {
 	if ((no_browser == 0)); then
 		build_browser_if_needed || exit 1
 	fi
-	validate_browser_proxy || true
+	validate_browser_proxy || exit 1
 	wait_for_proxy_or_warn || exit 1
 	print_summary
 }

@@ -10,6 +10,8 @@
 # defines functions with the "Backend" noun plus a few descriptive
 # variables. This file contains everything common to all routers.
 
+# This library is dot-sourced, so strict mode and stop-on-error behavior apply
+# in the caller's script scope as well as to functions defined below.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -36,6 +38,15 @@ else {
     'system'
 }
 $script:I2P_ROUTER_SOURCES = @('system', 'vendored')
+
+$script:ROUTER_HTTP_PROXY_HOST_OVERRIDE =
+    -not [string]::IsNullOrWhiteSpace($env:ROUTER_HTTP_PROXY_HOST)
+$script:ROUTER_HTTP_PROXY_PORT_OVERRIDE =
+    -not [string]::IsNullOrWhiteSpace($env:ROUTER_HTTP_PROXY_PORT)
+$script:ROUTER_SOCKS_PROXY_HOST_OVERRIDE =
+    -not [string]::IsNullOrWhiteSpace($env:ROUTER_SOCKS_PROXY_HOST)
+$script:ROUTER_SOCKS_PROXY_PORT_OVERRIDE =
+    -not [string]::IsNullOrWhiteSpace($env:ROUTER_SOCKS_PROXY_PORT)
 
 $script:ROUTER_HTTP_PROXY_HOST = if ($env:ROUTER_HTTP_PROXY_HOST) {
     $env:ROUTER_HTTP_PROXY_HOST
@@ -174,6 +185,8 @@ function Get-RouterConfLanguage {
     return (Get-RouterConfValue 'I2PD_BROWSER_LANGUAGE')
 }
 
+# Persist only the managed keys, preserve unrelated lines, and replace the
+# file through a sibling temporary file to avoid exposing partial contents.
 function Set-RouterConf {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -470,11 +483,32 @@ function Get-RouterSocksProxyPort {
 }
 
 function Get-RouterHttpProxy {
-    return ((Get-RouterHttpProxyHost) + ':' + (Get-RouterHttpProxyPort))
+    $hostName = Get-RouterHttpProxyHost
+    if ($hostName.Contains(':')) {
+        return ('[' + $hostName + ']:' + (Get-RouterHttpProxyPort))
+    }
+    return ($hostName + ':' + (Get-RouterHttpProxyPort))
 }
 
 function Get-RouterSocksProxy {
-    return ((Get-RouterSocksProxyHost) + ':' + (Get-RouterSocksProxyPort))
+    $hostName = Get-RouterSocksProxyHost
+    if ($hostName.Contains(':')) {
+        return ('[' + $hostName + ']:' + (Get-RouterSocksProxyPort))
+    }
+    return ($hostName + ':' + (Get-RouterSocksProxyPort))
+}
+
+function Test-RouterProxyEndpoint {
+    param([string]$HostName, [string]$Port)
+    $portNumber = 0
+    return ($HostName -eq '127.0.0.1' -and
+        [int]::TryParse($Port, [ref]$portNumber) -and
+        $portNumber -ge 1 -and $portNumber -le 65535)
+}
+
+function Test-RouterProxySettings {
+    return ((Test-RouterProxyEndpoint (Get-RouterHttpProxyHost) (Get-RouterHttpProxyPort)) -and
+        (Test-RouterProxyEndpoint (Get-RouterSocksProxyHost) (Get-RouterSocksProxyPort)))
 }
 
 function Get-RouterConsoleUrl { return (Get-BackendConsoleUrl) }
@@ -494,7 +528,13 @@ function Get-RouterState {
     return 'stopped'
 }
 
+# Leave an already-running unmanaged router untouched; it may be owned by a
+# system service or another user-controlled launch path.
 function Start-Router {
+    if (-not (Test-RouterProxySettings)) {
+        Write-RouterError 'Proxy overrides must use 127.0.0.1 and ports from 1 to 65535.'
+        return $false
+    }
     if (Get-BackendIsRunning) {
         if (Get-BackendIsManaged) {
             Write-RouterLog 'The I2P router is already running (managed by I2Pd Browser).'
@@ -517,6 +557,8 @@ function Start-Router {
     return (Start-Backend)
 }
 
+# Stop only an instance identified as project-managed so system routers are
+# not terminated by a browser management command.
 function Stop-Router {
     if (-not (Get-BackendIsRunning)) {
         Write-RouterLog 'The I2P router is not running.'

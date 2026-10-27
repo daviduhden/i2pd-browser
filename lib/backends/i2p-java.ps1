@@ -157,6 +157,70 @@ function Install-BackendDependencies {
     return $false
 }
 
+function Set-I2pJavaConfigValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Key,
+        [Parameter(Mandatory = $true)][string]$Value
+    )
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and
+        $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+    $encoding = New-Object Text.UTF8Encoding $hasBom
+    $offset = if ($hasBom) { 3 } else { 0 }
+    $content = $encoding.GetString($bytes, $offset, $bytes.Length - $offset)
+    $pattern = '(?m)^' + [regex]::Escape($Key) + '=[^\r\n]*'
+    if ([regex]::Matches($content, $pattern).Count -ne 1) { return $false }
+    $updated = [regex]::Replace($content, $pattern, "$Key=$Value", 1)
+    $temporary = "$Path.tmp.$PID"
+    try {
+        [IO.File]::WriteAllText($temporary, $updated, $encoding)
+        [IO.File]::Replace($temporary, $Path, $null)
+    }
+    catch {
+        Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+    return $true
+}
+
+function Set-I2pJavaProxyOverrides {
+    $tunnels = Join-Path $script:BACKEND_DATA_DIR 'i2ptunnel.config'
+    if ($script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or
+        $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE) {
+        $hostName = Get-RouterHttpProxyHost
+        $port = Get-RouterHttpProxyPort
+        $addressBook = Join-Path $script:BACKEND_DATA_DIR 'addressbook/config.txt'
+        $routerConfig = Join-Path $script:BACKEND_DATA_DIR 'router.config'
+        if (-not (Set-I2pJavaConfigValue -Path $tunnels `
+                    -Key 'tunnel.0.interface' -Value $hostName)) { return $false }
+        if (-not (Set-I2pJavaConfigValue -Path $tunnels `
+                    -Key 'tunnel.0.listenPort' -Value $port)) { return $false }
+        if (-not (Set-I2pJavaConfigValue -Path $addressBook `
+                    -Key 'proxy_host' -Value $hostName)) { return $false }
+        if (-not (Set-I2pJavaConfigValue -Path $addressBook `
+                    -Key 'proxy_port' -Value $port)) { return $false }
+        if (-not (Set-I2pJavaConfigValue -Path $routerConfig `
+                    -Key 'router.updateProxyHost' -Value $hostName)) { return $false }
+        if (-not (Set-I2pJavaConfigValue -Path $routerConfig `
+                    -Key 'router.updateProxyPort' -Value $port)) { return $false }
+    }
+    if ($script:ROUTER_SOCKS_PROXY_HOST_OVERRIDE -or
+        $script:ROUTER_SOCKS_PROXY_PORT_OVERRIDE) {
+        if (-not (Set-I2pJavaConfigValue -Path $tunnels `
+                    -Key 'tunnel.1.interface' -Value (Get-RouterSocksProxyHost))) {
+            return $false
+        }
+        if (-not (Set-I2pJavaConfigValue -Path $tunnels `
+                    -Key 'tunnel.1.listenPort' -Value (Get-RouterSocksProxyPort))) {
+            return $false
+        }
+    }
+    return $true
+}
+
+# Seed only missing files: this is both the initial configuration copy and
+# the preservation boundary for existing effective settings and router state.
 function Initialize-BackendConfig {
     $src = $script:BACKEND_CONFIG_DIR
     $dst = $script:BACKEND_DATA_DIR
@@ -178,6 +242,10 @@ function Initialize-BackendConfig {
     }
     New-Item -ItemType Directory -Force -Path (Join-Path $dst 'addressbook') `
         | Out-Null
+    if (-not (Set-I2pJavaProxyOverrides)) {
+        Write-RouterError 'Could not apply proxy overrides to the I2P (Java) configuration.'
+        return $false
+    }
     return $true
 }
 
@@ -263,6 +331,8 @@ function Get-BackendClasspath {
     return (($jars | ForEach-Object { $_.FullName }) -join ';')
 }
 
+# Pass an absolute isolated config path to Java so the router does not use
+# the launching user's global configuration directory.
 function Start-Backend {
     $home = Get-I2pJavaHome
     if (-not $home) {

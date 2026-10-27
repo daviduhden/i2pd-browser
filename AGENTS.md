@@ -63,6 +63,7 @@ CI workflow. These manual checks are the available validation:
 
 ```sh
 bash tests/test-i18n.bash
+bash tests/test-proxy-policy.bash
 pwsh -NoProfile -File tests/test-i18n.ps1   # when pwsh is available
 bash -n install.bash build/build.bash build/scripts/*.bash \
   lib/*.bash lib/backends/*.bash tests/*.bash i2pd/*.bash \

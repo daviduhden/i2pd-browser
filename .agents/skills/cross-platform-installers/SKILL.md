@@ -141,6 +141,7 @@ inspection.
 - `lib/i18n.bash`, `lib/i18n.ps1` - message loading.
 - `.gitattributes` - CRLF/LF rules.
 - `README.md` - command reference and platform notes.
+- `docs/configuration-and-source-map.md` - cross-platform config/source map.
 - Related skills: `i2p-router-integration`, `localization-maintenance`,
   `browser-build-validation`.
 

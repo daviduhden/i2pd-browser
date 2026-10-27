@@ -10,6 +10,7 @@
 # variables. This file contains everything that is common to all
 # routers and delegates the implementation specific parts.
 
+# This file is sourced into its caller, so strict mode also affects that shell.
 set -Eeuo pipefail
 
 # Resolve the repository root from this file's location, unless the
@@ -37,9 +38,13 @@ I2P_ROUTER_CHOICES=(i2pd i2p-java)
 I2P_ROUTER_SOURCE_DEFAULT="${I2P_ROUTER_SOURCE_DEFAULT:-system}"
 I2P_ROUTER_SOURCES=(system vendored)
 
-# Normalized local endpoints. Both backends are configured to listen
-# on these exact addresses, so the Firefox profile does not depend on
-# the selected router.
+# Capture whether callers supplied endpoint overrides before setting defaults;
+# backends use these flags to preserve custom effective configs when unset.
+# Backend files are sourced later and consume these flags.
+# shellcheck disable=SC2034
+ROUTER_HTTP_PROXY_OVERRIDE="${ROUTER_HTTP_PROXY_HOST:+set}${ROUTER_HTTP_PROXY_PORT:+set}"
+# shellcheck disable=SC2034
+ROUTER_SOCKS_PROXY_OVERRIDE="${ROUTER_SOCKS_PROXY_HOST:+set}${ROUTER_SOCKS_PROXY_PORT:+set}"
 ROUTER_HTTP_PROXY_HOST="${ROUTER_HTTP_PROXY_HOST:-127.0.0.1}"
 ROUTER_HTTP_PROXY_PORT="${ROUTER_HTTP_PROXY_PORT:-4444}"
 ROUTER_SOCKS_PROXY_HOST="${ROUTER_SOCKS_PROXY_HOST:-127.0.0.1}"
@@ -155,6 +160,9 @@ router_conf_get_source() {
 	fi
 }
 
+# Persist only the three managed settings while retaining unrelated user
+# lines. Write to a sibling temporary file and rename so readers never see
+# a partially written selection.
 router_conf_set() {
 	local name="$1" source="${2-}" selected_locale="${3-}" file tmp
 	file="$(router_conf_file)"
@@ -483,13 +491,39 @@ router_socks_proxy_port() {
 }
 
 router_http_proxy() {
-	printf '%s:%s\n' \
-		"$(router_http_proxy_host)" "$(router_http_proxy_port)"
+	local host
+	host="$(router_http_proxy_host)"
+	if [[ $host == *:* ]]; then
+		printf '[%s]:%s\n' "$host" "$(router_http_proxy_port)"
+	else
+		printf '%s:%s\n' "$host" "$(router_http_proxy_port)"
+	fi
 }
 
 router_socks_proxy() {
-	printf '%s:%s\n' \
-		"$(router_socks_proxy_host)" "$(router_socks_proxy_port)"
+	local host
+	host="$(router_socks_proxy_host)"
+	if [[ $host == *:* ]]; then
+		printf '[%s]:%s\n' "$host" "$(router_socks_proxy_port)"
+	else
+		printf '%s:%s\n' "$host" "$(router_socks_proxy_port)"
+	fi
+}
+
+# Keep proxy binds local and reject invalid ports before they reach a router
+# command line, a generated Firefox policy, or a readiness probe.
+router_validate_proxy_endpoint() {
+	local host="$1" port="$2"
+	[[ $host == 127.0.0.1 ]] || return 1
+	[[ $port =~ ^[0-9]{1,5}$ ]] || return 1
+	((10#$port >= 1 && 10#$port <= 65535))
+}
+
+router_validate_proxy_settings() {
+	router_validate_proxy_endpoint \
+		"$(router_http_proxy_host)" "$(router_http_proxy_port)" &&
+		router_validate_proxy_endpoint \
+			"$(router_socks_proxy_host)" "$(router_socks_proxy_port)"
 }
 
 router_console_url() {
@@ -524,6 +558,8 @@ router_install_dependencies() {
 	backend_install_dependencies
 }
 
+# Delegate release-specific installation only after the selected backend
+# has been loaded; each backend owns its asset layout and integrity checks.
 router_vendor_install() {
 	backend_vendor_install
 }
@@ -541,7 +577,13 @@ router_state() {
 	fi
 }
 
+# Do not take ownership of an already-running system router. Backends decide
+# whether their instance is running and whether this project started it.
 router_start() {
+	if ! router_validate_proxy_settings; then
+		router_error "Proxy overrides must use 127.0.0.1 and ports from 1 to 65535."
+		return 1
+	fi
 	if backend_is_running; then
 		if backend_is_managed; then
 			router_log "The I2P router is already running (managed by I2Pd Browser)."
@@ -570,6 +612,8 @@ router_start() {
 	backend_start
 }
 
+# Refuse to stop an instance not identified as project-managed; it may belong
+# to a system service or another user-controlled launch path.
 router_stop() {
 	if ! backend_is_running; then
 		router_log "The I2P router is not running."

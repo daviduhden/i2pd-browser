@@ -15,9 +15,10 @@ test.
 
 ## Non-negotiable invariants
 
-- Firefox uses a locked manual proxy. The HTTP and SSL proxy are
-  `127.0.0.1:4444`, DNS goes through the proxy, and the passthrough
-  list is empty.
+- Firefox uses a locked manual proxy. HTTP and SSL point to the selected
+  router HTTP endpoint (default `127.0.0.1:4444`), DNS goes through the
+  proxy, and the passthrough list is empty. Override hosts are restricted
+  to loopback `127.0.0.1` and ports to 1-65535.
 - `network.proxy.type` is `1`, and
   `network.proxy.failover_direct` is locked to `false`. A proxy failure
   must stop navigation, not fall back to direct access.
@@ -108,7 +109,10 @@ git diff -- build/scripts lib install.bash install.ps1
 Inspect the built bundle when one exists:
 
 ```sh
-jq -e '.policies.Proxy.HTTPProxy == "127.0.0.1:4444"' \
+expected="${ROUTER_HTTP_PROXY_HOST:-127.0.0.1}:${ROUTER_HTTP_PROXY_PORT:-4444}"
+jq --arg expected "$expected" -e \
+  '.policies.Proxy.HTTPProxy == $expected and
+   .policies.Proxy.SSLProxy == $expected' \
   browser/distribution/policies.json
 grep -n 'intl.locale.requested' browser/data/user.js
 ```
@@ -150,6 +154,7 @@ Do not send traffic to a clearnet test site. Use the existing
 - `build/scripts/start-i2pd-browser.bash` - Linux launcher isolation.
 - `build/scripts/start-i2pd-browser.ps1` - Windows launcher.
 - `README.md` - documented ports, proxies, and update behavior.
+- `docs/configuration-and-source-map.md` - proxy, listener, DNS, and UPnP config relationships.
 - Related skills: `firefox-esr-bundling`, `i2p-router-integration`,
   `browser-build-validation`.
 

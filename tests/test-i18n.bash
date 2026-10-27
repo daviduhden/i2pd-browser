@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exercise locale catalog parity, normalization and selection, config-file
+# preservation, and the Firefox locale preference wiring without network access.
+# All temporary configuration and catalog data is isolated under mktemp.
 set -Eeuo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
