@@ -25,7 +25,7 @@ specialized agent definition files.
 3. Keep the root rule authoritative. Specialized agents must include
    `Post-Change Knowledge Synchronization`; skills must include
    `Maintenance & Continuous Learning`. Preserve Agent Skills YAML frontmatter.
-4. Keep `scripts/validate-agent-maintenance.py` dependency-free. It compares
+4. Keep `scripts/validate-agent-knowledge.py` dependency-free. It compares
    the Git base against `HEAD` and includes local staged, unstaged, and
    untracked changes. The PR workflow supplies the base commit. Generated and
    user-state directories are excluded from project-change enforcement.
@@ -34,7 +34,7 @@ specialized agent definition files.
    required maintenance sections. Run it locally:
 
    ```sh
-   python3 scripts/validate-agent-maintenance.py
+   python3 scripts/validate-agent-knowledge.py --scope worktree
    ```
 
    In CI, pass `--base <pull-request-base-sha>` as the workflow does.
@@ -69,8 +69,7 @@ or validation steps have changed or when implementation work produced reusable
 knowledge. Correct instructions that proved wrong, remove obsolete details,
 and keep references and repository-relative paths valid. Avoid notes tied only
 to one execution. If another agent or skill owns the affected procedure, update
-or link that source rather than duplicating it. Run `python3
-scripts/validate-agent-maintenance.py` after synchronizing. Its structural checks
+or link that source rather than duplicating it. Run `python3 scripts/validate-agent-knowledge.py --scope worktree` after synchronizing. Its structural checks
 do not judge semantic relevance; review that manually. Report the
 synchronization result and checks actually run in the final response. If
 synchronization cannot be completed, state why and mark the task incomplete.

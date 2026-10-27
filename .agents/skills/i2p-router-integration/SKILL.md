@@ -148,8 +148,7 @@ or validation steps have changed or when implementation work produced reusable
 knowledge. Correct instructions that proved wrong, remove obsolete details, and
 keep references and repository-relative paths valid. Avoid notes tied only to one
 execution. If another agent or skill owns the affected procedure, update or link
-that source rather than duplicating it. Run `python3
-scripts/validate-agent-maintenance.py` after synchronizing. Its structural checks
+that source rather than duplicating it. Run `python3 scripts/validate-agent-knowledge.py --scope worktree` after synchronizing. Its structural checks
 do not judge semantic relevance; review that manually. Report the synchronization
 result and checks actually run in the final response. If synchronization cannot
 be completed, state why and mark the task incomplete.
