@@ -222,14 +222,27 @@ function Test-BuildInputsNewer {
 function Build-BrowserIfNeeded {
     $firefox = Join-Path $script:I2PD_BROWSER_ROOT 'browser/firefox.exe'
     $localeFile = Join-Path $script:I2PD_BROWSER_ROOT 'browser/.i2pd-browser-locale'
+    $policies = Join-Path $script:I2PD_BROWSER_ROOT 'browser/distribution/policies.json'
+    $expectedProxy = Get-RouterHttpProxy
     if ((Test-Path $firefox) -and (Test-Path $localeFile) -and
         ((Get-Content $localeFile -Raw).Trim() -eq
-            $script:I2pdBrowserLanguage)) {
+            $script:I2pdBrowserLanguage) -and (Test-Path $policies)) {
+        try {
+            $currentPolicy = Get-Content $policies -Raw | ConvertFrom-Json
+        }
+        catch {
+            $currentPolicy = $null
+        }
+        if ($currentPolicy -and
+            $currentPolicy.policies.Proxy.HTTPProxy -eq $expectedProxy -and
+            $currentPolicy.policies.Proxy.SSLProxy -eq $expectedProxy) {
         Write-RouterLog 'The Firefox ESR bundle is already built.'
         if (Test-BuildInputsNewer) {
             Write-RouterWarn (Get-I18nMessage 'warn.build-inputs-newer')
         }
         return $true
+        }
+        Write-RouterLog 'The existing Firefox proxy policy does not match the selected router endpoint; rebuilding.'
     }
     Write-RouterLog 'Building the Firefox ESR bundle...'
     & (Join-Path $script:I2PD_BROWSER_ROOT 'build/build.ps1') `
@@ -252,9 +265,10 @@ function Test-BrowserProxy {
         Write-RouterWarn "Could not parse the built Firefox policies at $policies."
         return $false
     }
-    $got = $config.policies.Proxy.HTTPProxy
-    if ($got -and $got -ne $expected) {
-        Write-RouterWarn "The Firefox proxy ($got) does not match the selected router proxy ($expected); rebuild the browser."
+    $gotHttp = $config.policies.Proxy.HTTPProxy
+    $gotSsl = $config.policies.Proxy.SSLProxy
+    if ($gotHttp -ne $expected -or $gotSsl -ne $expected) {
+        Write-RouterWarn "The Firefox proxy ($gotHttp / $gotSsl) does not match the selected router proxy ($expected); rebuild the browser."
         return $false
     }
     Write-RouterLog "Firefox proxy endpoint: $expected"
@@ -312,7 +326,7 @@ function Invoke-Install {
         if (-not (Build-BrowserIfNeeded)) { exit 1 }
     }
 
-    Test-BrowserProxy | Out-Null
+    if (-not (Test-BrowserProxy)) { exit 1 }
     if (-not (Wait-ProxyOrWarn)) { exit 1 }
     Show-Summary
 }
@@ -369,7 +383,7 @@ function Invoke-Configure {
     if (-not $script:NoBrowser) {
         if (-not (Build-BrowserIfNeeded)) { exit 1 }
     }
-    Test-BrowserProxy | Out-Null
+    if (-not (Test-BrowserProxy)) { exit 1 }
     if (-not (Wait-ProxyOrWarn)) { exit 1 }
     Show-Summary
 }

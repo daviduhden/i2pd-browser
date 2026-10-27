@@ -21,8 +21,11 @@ commands. Use `firefox-esr-bundling` for Firefox-specific work.
   convention. A new backend must provide the installed, running,
   managed, misconfigured, prepare-config, console, start, stop,
   dependency, and vendor-install operations used by the dispatcher.
-- Both backends normalize the HTTP proxy to `127.0.0.1:4444` and SOCKS
-  to `127.0.0.1:4447`. i2pd uses console `127.0.0.1:7070` and SAM
+- Both backends default the HTTP proxy to `127.0.0.1:4444` and SOCKS
+  to `127.0.0.1:4447`. `ROUTER_HTTP_PROXY_HOST` / `PORT` and
+  `ROUTER_SOCKS_PROXY_HOST` / `PORT` can override these loopback endpoints;
+  builders consume the HTTP override for both Firefox HTTP and SSL policy
+  fields. i2pd uses console `127.0.0.1:7070` and SAM
   `7656`; I2P (Java) uses console `127.0.0.1:7657` and starts no SAM.
 - i2pd runs from `i2pd/` with `--datadir=.`. Its config, certificates,
   address book, and runtime state share that directory. Runtime state
@@ -62,10 +65,10 @@ commands. Use `firefox-esr-bundling` for Firefox-specific work.
 6. For vendored i2pd, keep the SHA-512 fetch, exact asset-name match,
    failure cleanup, and `VERSION` write. For vendored I2P (Java), keep
    HTTPS and state the missing integrity check in review notes.
-7. If you change ports, update both backend configs, the Firefox policy
-   endpoint, the shared defaults, documentation, and the proxy
-   validation. The browser build currently validates
-   `127.0.0.1:4444`.
+7. Keep endpoint overrides loopback-only (`127.0.0.1`) and validate ports
+   in the 1-65535 range. The installers pass the selected HTTP endpoint to
+   the builders, which rewrite generated HTTP and SSL policy values; preserve
+   the manual mode, lock, DNS-through-proxy, and empty passthrough controls.
 8. Update `README.md`, `i2p-java/README.md`, and the relevant skill
    when observable behavior changes.
 
@@ -87,6 +90,7 @@ Read-only or low-impact checks:
 ```sh
 ./install.bash status
 ./install.bash detect
+bash tests/test-proxy-policy.bash
 jq -e '.policies.Proxy.HTTPProxy == "127.0.0.1:4444"' \
   build/preferences/distribution/policies.json
 ```
@@ -131,6 +135,7 @@ delete its PID file, or remove its data directory.
 - `i2p-java/config/*` - vendored I2P (Java) config.
 - `i2p-java/README.md` - backend-specific layout.
 - `README.md` - supported routers, ports, and lifecycle.
+- `docs/configuration-and-source-map.md` - router config files and cross-backend invariants.
 - Related skills: `privacy-and-leak-audit`,
   `cross-platform-installers`, `browser-build-validation`.
 

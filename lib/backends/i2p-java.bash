@@ -316,9 +316,55 @@ backend_console_url() {
 	printf 'http://127.0.0.1:%s/\n' "$BACKEND_CONSOLE_PORT"
 }
 
-# Seed the effective configuration directory from the vendored files.
-# Existing files are never overwritten, so router state and any user
-# changes are preserved.
+# Update one existing Java properties-style file atomically, requiring the
+# expected key so a config schema change cannot silently ignore an override.
+i2p_java_set_config_value() {
+	local file="$1" key="$2" value="$3" tmp
+	tmp="${file}.tmp.$$"
+	if awk -v key="$key" -v value="$value" '
+		BEGIN { prefix = key "=" }
+		index($0, prefix) == 1 { print prefix value; found++; next }
+		{ print }
+		END { if (!found) exit 1 }
+	' "$file" >"$tmp"; then
+		mv "$tmp" "$file"
+	else
+		rm -f "$tmp"
+		return 1
+	fi
+}
+
+# Apply explicit endpoint overrides only to effective runtime files. The
+# tracked config/ templates and existing user values remain untouched when
+# the corresponding environment override is absent.
+i2p_java_apply_proxy_overrides() {
+	local http_host http_port socks_host socks_port entry file key value
+	if [[ -n $ROUTER_HTTP_PROXY_OVERRIDE ]]; then
+		http_host="$(router_http_proxy_host)"
+		http_port="$(router_http_proxy_port)"
+		for entry in \
+			"$BACKEND_DATA_DIR/i2ptunnel.config|tunnel.0.interface|$http_host" \
+			"$BACKEND_DATA_DIR/i2ptunnel.config|tunnel.0.listenPort|$http_port" \
+			"$BACKEND_DATA_DIR/addressbook/config.txt|proxy_host|$http_host" \
+			"$BACKEND_DATA_DIR/addressbook/config.txt|proxy_port|$http_port" \
+			"$BACKEND_DATA_DIR/router.config|router.updateProxyHost|$http_host" \
+			"$BACKEND_DATA_DIR/router.config|router.updateProxyPort|$http_port"; do
+			IFS='|' read -r file key value <<<"$entry"
+			i2p_java_set_config_value "$file" "$key" "$value" || return 1
+		done
+	fi
+	if [[ -n $ROUTER_SOCKS_PROXY_OVERRIDE ]]; then
+		socks_host="$(router_socks_proxy_host)"
+		socks_port="$(router_socks_proxy_port)"
+		i2p_java_set_config_value "$BACKEND_DATA_DIR/i2ptunnel.config" \
+			tunnel.1.interface "$socks_host" || return 1
+		i2p_java_set_config_value "$BACKEND_DATA_DIR/i2ptunnel.config" \
+			tunnel.1.listenPort "$socks_port" || return 1
+	fi
+}
+
+# Seed only missing files so first-run defaults do not overwrite effective
+# settings or runtime state. Keep newly created data private.
 backend_prepare_config() {
 	local src="$BACKEND_CONFIG_DIR"
 	local dst="$BACKEND_DATA_DIR"
@@ -350,9 +396,15 @@ backend_prepare_config() {
 		router_error "Could not prepare the I2P (Java) configuration."
 		return 1
 	fi
+	i2p_java_apply_proxy_overrides || {
+		router_error "Could not apply proxy overrides to the I2P (Java) configuration."
+		return 1
+	}
 	return 0
 }
 
+# Launch Java I2P with its configuration root explicitly set to the isolated
+# data directory; omitting this property could use the user's global ~/.i2p.
 backend_start() {
 	local home java cp jar data_dir
 

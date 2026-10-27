@@ -93,11 +93,12 @@ test -x browser/firefox
 test -f browser/data/user.js
 grep -q 'intl.locale.requested' browser/data/user.js
 test "$(cat browser/.i2pd-browser-locale)" = en-US
-jq -e '
+expected="${ROUTER_HTTP_PROXY_HOST:-127.0.0.1}:${ROUTER_HTTP_PROXY_PORT:-4444}"
+jq --arg expected "$expected" -e '
   .policies.Proxy.Mode == "manual" and
   .policies.Proxy.Locked == true and
-  .policies.Proxy.HTTPProxy == "127.0.0.1:4444" and
-  .policies.Proxy.SSLProxy == "127.0.0.1:4444" and
+  .policies.Proxy.HTTPProxy == $expected and
+  .policies.Proxy.SSLProxy == $expected and
   .policies.Proxy.UseProxyForDNS == true and
   .policies.Proxy.Passthrough == ""
 ' browser/distribution/policies.json
@@ -176,6 +177,7 @@ post-build smoke test in this repository.
 - `build/scripts/**` - launchers.
 - `tests/test-i18n.bash`, `tests/test-i18n.ps1` - only tracked tests.
 - `README.md` - user-facing build and troubleshooting notes.
+- `docs/configuration-and-source-map.md` - tracked config inputs and generated bundle outputs.
 - Related skills: `firefox-esr-bundling`, `privacy-and-leak-audit`,
   `cross-platform-installers`.
 

@@ -108,6 +108,8 @@ i2pd_vendor_asset_name() {
 }
 
 # Download and extract the latest stable i2pd release.
+# Verify the downloaded asset against the release SHA-512 manifest before
+# extraction; the managed binary is not published from an unchecked archive.
 backend_vendor_install() {
 	local version asset url dir tmp archive root sums
 
@@ -247,8 +249,11 @@ backend_prepare_config() {
 	return 0
 }
 
+# Start from the router's configuration/data directory so relative config
+# paths and runtime state stay together under i2pd/.
 backend_start() {
 	local i2pd_path arch
+	local -a i2pd_args=(--datadir=.)
 
 	i2pd_path="$(i2pd_find_path)" || {
 		router_error "i2pd not found in standard or Homebrew" \
@@ -272,11 +277,19 @@ backend_start() {
 	esac
 
 	router_log "Starting i2pd with binary: $i2pd_path"
+	if [[ -n $ROUTER_HTTP_PROXY_OVERRIDE ]]; then
+		i2pd_args+=("--httpproxy.address=$(router_http_proxy_host)"
+		"--httpproxy.port=$(router_http_proxy_port)")
+	fi
+	if [[ -n $ROUTER_SOCKS_PROXY_OVERRIDE ]]; then
+		i2pd_args+=("--socksproxy.address=$(router_socks_proxy_host)"
+		"--socksproxy.port=$(router_socks_proxy_port)")
+	fi
 	# i2pd reads i2pd.conf and tunnels.conf from its data directory.
 	(
 		cd "$BACKEND_DIR" || exit 1
 		screen -Adm -S "$BACKEND_SCREEN_SESSION" \
-			"$i2pd_path" --datadir=.
+			"$i2pd_path" "${i2pd_args[@]}"
 	)
 }
 

@@ -45,6 +45,11 @@ specialized agent definition files.
    implementation.
 7. Review the entire instruction system once after changes to this policy,
    agents, skills, or enforcement. Repeat only if the review finds a defect.
+8. For source-documentation work, keep `docs/configuration-and-source-map.md`
+   synchronized with maintained configuration families, producer/consumer
+   relationships, exclusions, and cross-file invariants. Add reusable findings
+   to the skill that owns the affected workflow; do not use a cosmetic skills
+   edit merely to satisfy the automatic change-coverage check.
 
 ## Enforcement limits
 

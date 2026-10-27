@@ -361,8 +361,20 @@ vendored.
 All services listen on the loopback interface only. No administrative
 interface or proxy is exposed to the LAN.
 
-Firefox always uses `127.0.0.1:4444` and never falls back to a direct
-connection: `network.proxy.failover_direct` is locked to `false`.
+Firefox uses the selected router's loopback HTTP proxy endpoint (default
+`127.0.0.1:4444`) and never falls back to a direct connection:
+`network.proxy.failover_direct` is locked to `false`.
+
+Proxy endpoints can be changed per invocation with `ROUTER_HTTP_PROXY_HOST`,
+`ROUTER_HTTP_PROXY_PORT`, `ROUTER_SOCKS_PROXY_HOST`, and
+`ROUTER_SOCKS_PROXY_PORT`. Bind hosts are restricted to `127.0.0.1`,
+and ports must be between 1 and 65535. The installer passes these values to the
+selected router and rebuilds an existing Firefox bundle when its generated
+policy does not match. Both builders rewrite the generated HTTP and SSL proxy
+policies to the selected HTTP endpoint, replacing the template default.
+Because these are environment overrides, provide them again when starting or restarting a router from a later command.
+The defaults remain HTTP 4444 and SOCKS 4447. See
+`docs/configuration-and-source-map.md` for the affected files.
 
 ## Additional information
 

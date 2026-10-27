@@ -1,3 +1,13 @@
+<#
+.SYNOPSIS
+    Loads localized messages for the Bash and PowerShell project tools.
+.DESCRIPTION
+    Selects a supported locale, loads the English catalog as a fallback,
+    overlays the selected UTF-8 key/value catalog, and interpolates messages.
+    Catalog files are parsed as data and are never executed.
+#>
+# This file is dot-sourced by entry points, so strict mode applies in their
+# current script scope too.
 Set-StrictMode -Version Latest
 
 $script:I2pdBrowserLocales = @('en-US', 'es-ES', 'ru', 'zh-CN')

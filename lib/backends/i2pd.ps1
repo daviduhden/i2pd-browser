@@ -173,6 +173,8 @@ function Get-I2pdVendorAssetName {
     }
 }
 
+# Validate the release asset against its SHA-512 manifest before extracting
+# it into the managed vendor directory.
 function Install-BackendVendor {
     $version = Get-RouterLatestGithubRelease -Repo 'PurpleI2P/i2pd'
     if (-not $version) { return $false }
@@ -242,6 +244,8 @@ function Install-BackendVendor {
     return $true
 }
 
+# Start with the tracked i2pd configuration directory as the router data root;
+# relative configuration paths and runtime state are resolved from this folder.
 function Start-Backend {
     $binary = Get-I2pdPath
     if (-not $binary) {
@@ -250,8 +254,19 @@ function Start-Backend {
     }
 
     Write-RouterLog "Starting i2pd with binary: $binary"
+    $arguments = @('--datadir=.')
+    if ($script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or
+        $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE) {
+        $arguments += "--httpproxy.address=$(Get-RouterHttpProxyHost)"
+        $arguments += "--httpproxy.port=$(Get-RouterHttpProxyPort)"
+    }
+    if ($script:ROUTER_SOCKS_PROXY_HOST_OVERRIDE -or
+        $script:ROUTER_SOCKS_PROXY_PORT_OVERRIDE) {
+        $arguments += "--socksproxy.address=$(Get-RouterSocksProxyHost)"
+        $arguments += "--socksproxy.port=$(Get-RouterSocksProxyPort)"
+    }
     $process = Start-Process -FilePath $binary `
-        -ArgumentList '--datadir=.' `
+        -ArgumentList $arguments `
         -WorkingDirectory $script:BACKEND_DIR `
         -WindowStyle Hidden -PassThru
     Set-Content -Path $script:BACKEND_PID_FILE -Value $process.Id `

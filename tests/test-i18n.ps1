@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Checks localization behavior without starting the browser or router.
+.DESCRIPTION
+    Verifies catalog key parity, locale normalization, configuration
+    preservation, and the selected-language loader using temporary state.
+#>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 

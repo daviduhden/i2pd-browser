@@ -303,6 +303,12 @@ function Format-PoliciesJson {
     catch {
         Stop-Build "Could not parse $policies."
     }
+    if (-not (Test-RouterProxySettings)) {
+        Stop-Build 'Proxy overrides must use 127.0.0.1 and ports from 1 to 65535.'
+    }
+    $endpoint = Get-RouterHttpProxy
+    $data.policies.Proxy.HTTPProxy = $endpoint
+    $data.policies.Proxy.SSLProxy = $endpoint
     $json = $data | ConvertTo-Json -Depth 100
     # Write UTF-8 without a BOM: Windows PowerShell 5.1 adds one with
     # Set-Content -Encoding utf8.
@@ -380,9 +386,10 @@ function Test-BundleLayout {
         Join-Path $script:BrowserDir 'distribution\policies.json'
     ) -Raw | ConvertFrom-Json
     $proxy = $policies.policies.Proxy
+    $expectedProxy = Get-RouterHttpProxy
     if ($proxy.Mode -ne 'manual' -or $proxy.Locked -ne $true -or
-        $proxy.HTTPProxy -ne '127.0.0.1:4444' -or
-        $proxy.SSLProxy -ne '127.0.0.1:4444' -or
+        $proxy.HTTPProxy -ne $expectedProxy -or
+        $proxy.SSLProxy -ne $expectedProxy -or
         $proxy.UseProxyForDNS -ne $true -or $proxy.Passthrough -ne '') {
         Stop-Build (Get-I18nMessage 'error.bundle-validation' @(
                 'Proxy policy'))
@@ -416,6 +423,10 @@ function Publish-Browser {
 
 function Main {
     Import-BuildArgs -Arguments $args
+
+    if (-not (Test-RouterProxySettings)) {
+        Stop-Build 'Proxy overrides must use 127.0.0.1 and ports from 1 to 65535.'
+    }
 
     if ($script:EsrProduct -notmatch '^[A-Za-z0-9._-]+$') {
         Stop-Build (Get-I18nMessage 'error.invalid-product' @(
