@@ -27,7 +27,7 @@ specialized agent definition files.
    `Maintenance & Continuous Learning`. Preserve Agent Skills YAML frontmatter.
 4. Keep `scripts/validate-agent-knowledge.pl` dependency-free. It compares
    the Git base against `HEAD` and includes local staged, unstaged, and
-   untracked changes. The PR workflow supplies the base commit. Generated and
+   untracked changes. Range comparisons supply an explicit base commit. Generated and
    user-state directories are excluded from project-change enforcement.
 5. The validator requires a non-empty content addition to an agent/skill
    instruction, checks skill frontmatter and local Markdown links, and checks
@@ -37,7 +37,7 @@ specialized agent definition files.
    perl scripts/validate-agent-knowledge.pl --scope worktree
    ```
 
-   In CI, pass `--base <pull-request-base-sha>` as the workflow does.
+   For committed comparisons, pass `--base <base-sha>` locally.
 6. Validate the workflow syntax and inspect its event, permissions, checkout
    depth, base selection, and command. Run the validator and `git diff --check`.
    Do not claim CI ran locally or that structural checks establish semantic
@@ -53,16 +53,16 @@ specialized agent definition files.
 
 ## Enforcement limits
 
-- GitHub Actions runs the validator on pull requests. There is no local hook;
-  contributors run the same command directly.
+- GitHub Actions runs the validator only on manual dispatch. There is no local
+  hook; contributors run the same command directly.
 - The validator cannot prove that prose is a meaningful improvement for the
   changed behavior. A human review remains required.
-- The pull request check validates the submitted change against its base; it
-  does not alter branch protection settings.
+- The manual check validates the checked-out worktree; range mode is available
+  for explicit committed comparisons. It does not alter branch protection settings.
 
 ## GitHub Actions pin maintenance
 
-The pull-request workflow pins each external action to an immutable
+The manual-only workflow pins each external action to an immutable
 40-character commit SHA; tags and branches are not acceptable because they can
 be moved. When changing a pin, verify the release SHA first and update the
 `uses:` line and its trailing `# vX.Y.Z` comment in the same edit. Keep the
