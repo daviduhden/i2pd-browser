@@ -58,8 +58,9 @@ build\build.cmd --language=en-US          # Windows
 ```
 
 `--install-deps` is opt-in and may use `sudo` or `winget`; never run it
-as part of a documentation or review task. There is no Makefile and no
-CI workflow. These manual checks are the available validation:
+as part of a documentation or review task. There is no Makefile; the only CI
+workflow is the read-only pull-request agent-knowledge validator. These manual
+checks are the available validation:
 
 ```sh
 bash tests/test-i18n.bash

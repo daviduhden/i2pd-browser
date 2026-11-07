@@ -60,6 +60,26 @@ specialized agent definition files.
 - The pull request check validates the submitted change against its base; it
   does not alter branch protection settings.
 
+## GitHub Actions pin maintenance
+
+The pull-request workflow pins each external action to an immutable
+40-character commit SHA; tags and branches are not acceptable because they can
+be moved. When changing a pin, verify the release SHA first and update the
+`uses:` line and its trailing `# vX.Y.Z` comment in the same edit. Keep the
+workflow's triggers, permissions, concurrency, job names, and commands
+unchanged.
+
+| Action | Version | Commit SHA |
+| --- | --- | --- |
+| `actions/checkout` | `v7.0.1` | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| `actions/upload-artifact` | `v7.0.2` | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` |
+| `actions/cache` | `v6.1.0` | `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` |
+| `actions/setup-java` | `v6.2.0` | `77dd5b2ce225ea11469928ac317850245a74ae78` |
+| `actions/setup-node` | `v7.1.0` | `949feb2413d6458794dcd2491c4babbbce0c15c1` |
+
+Validate a workflow edit with `actionlint .github/workflows/*.yml` and, when a
+`yamllint` configuration exists, `yamllint -c <config> .github/workflows`.
+
 ## Maintenance & Continuous Learning
 
 After using this skill to modify the repository, review this skill and the
