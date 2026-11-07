@@ -59,7 +59,7 @@ build\build.cmd --language=en-US          # Windows
 
 `--install-deps` is opt-in and may use `sudo` or `winget`; never run it
 as part of a documentation or review task. There is no Makefile; the only CI
-workflow is the read-only pull-request agent-knowledge validator. These manual
+workflow is the read-only manual agent-knowledge validator. These manual
 checks are the available validation:
 
 ```sh
@@ -202,7 +202,7 @@ for its contract tests. The validator requires Perl 5.14+ (JSON::PP core) and Gi
 core Perl modules, and publishes contract version `1.0.0`. All
 adopting repositories share the same CLI, AK001-AK006 identifiers, output
 schema, and exit codes (`0` pass, `1` policy failure, `2` execution/configuration
-error). For a pull request, pass both revisions with
+error). To compare committed revisions locally, pass both with
 `--scope range --base BASE_REF --head HEAD_REF`; compare from their merge base.
 
 Read [Agent Knowledge Validation Contract](docs/agent-knowledge-validation.md)
@@ -212,8 +212,9 @@ review; their warnings do not prove or disprove semantic correctness. Keep the
 canonical script and black-box Perl suite byte-identical across adopting
 repositories. Repository-specific requirements belong in the documented TOML
 configuration or a stable `AKX...` extension, never in a private fork of the
-shared rules. The GitHub PR workflow runs the same tests and range command;
-it does not edit files or require secrets.
+shared rules. All workflows are manual-only: start them from the Actions
+tab or with `gh workflow run`; the agent workflow runs the same tests and
+worktree validation and does not edit files or require secrets.
 
 ### Mandatory Definition of Done
 
