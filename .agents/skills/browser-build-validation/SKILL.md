@@ -157,8 +157,12 @@ authoring as passing tests.
 
 ## Common problems
 
-- **No CI or Makefile.** Validation is manual. The only tracked tests
-  are `tests/test-i18n.bash` and `tests/test-i18n.ps1`.
+- **Manual workflows, no Makefile.** The owner-only test matrix runs six Bash
+  suites and the Perl contract on Ubuntu, and four native suites under Windows
+  PowerShell 5.1 and 7 after parsing source. The separate knowledge workflow
+  validates explicit ranges or a worktree. Neither runs real browsers or routers.
+  Both original and re-run actors must equal the owner. A clean worktree
+  validation does not inspect committed proposal coverage.
 - **Build is network-dependent and destructive to the generated
   bundle.** Staging protects the published tree, and the profile is
   preserved, but a failed build can leave `.browser-build/` or

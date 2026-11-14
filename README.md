@@ -453,3 +453,11 @@ accessibility limitations, and performance evaluation. See
 agent-knowledge workflow is manual-only and can inspect an explicit Git range;
 it is not an automatic pull request check.
 
+## Manual CI
+
+The repository owner can run **Actions → Tests (Linux and Windows) → Run
+workflow** to execute the offline suites on Ubuntu and on Windows with
+PowerShell 5.1 and 7. There are no automatic push, pull request, or scheduled
+triggers. Jobs require both the original and re-run actors to be the repository
+owner; other actors' jobs are skipped. The agent-knowledge workflow uses the same
+restriction. See [contributing](CONTRIBUTING.md) for coverage and commands.

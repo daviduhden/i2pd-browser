@@ -142,6 +142,11 @@ correct locks across real processes, Windows process termination, or recovery
 under filesystem and power failures.
 
 The behavioral suites use temporary state and should run only when authorized.
+The manual owner-only test workflow runs the Bash/Perl suites on Ubuntu and the
+native PowerShell suites on Windows under 5.1 and 7. Both original and re-run
+actors must match the repository owner; unauthorized jobs are skipped before
+checkout. This CI uses fixtures, not real routers or browser builds. See
+[contributing](../CONTRIBUTING.md) for manual invocation and matrix coverage:
 
 
 ```sh

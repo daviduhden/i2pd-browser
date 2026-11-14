@@ -63,9 +63,10 @@ build\build.cmd --language=en-US          # Windows
 ```
 
 `--install-deps` is opt-in and may use `sudo` or `winget`; never run it
-as part of a documentation or review task. There is no Makefile; the only CI
-workflow is the read-only manual agent-knowledge validator. These manual
-checks are the available validation:
+as part of a documentation or review task. There is no Makefile. CI consists
+of manual-only, owner-gated test and agent-knowledge workflows. The test matrix
+runs Bash/Perl on Ubuntu and native suites on Windows PowerShell 5.1 and 7; it
+does not build Firefox or start routers. These manual checks are also available:
 
 ```sh
 bash tests/test-i18n.bash
@@ -228,9 +229,16 @@ review; their warnings do not prove or disprove semantic correctness. Keep the
 canonical script and black-box Perl suite byte-identical across adopting
 repositories. Repository-specific requirements belong in the documented TOML
 configuration or a stable `AKX...` extension, never in a private fork of the
-shared rules. All workflows are manual-only: start them from the Actions
-tab or with `gh workflow run`; the agent workflow runs the same tests and
-worktree validation and does not edit files or require secrets.
+shared rules. All workflows are manual-only and their jobs require both
+`github.actor` and `github.triggering_actor` to match `github.repository_owner`.
+Do not add push, pull request, schedule, workflow-call, or other event triggers.
+The owner can start them from Actions or `gh workflow run`; a non-owner dispatch
+or re-run skips every job before checkout or runner work. The test workflow
+executes offline fixtures in disposable runners, with no real browser/router
+startup. The agent workflow runs the contract tests and
+explicit range or worktree validation and does not edit files or require secrets.
+Range mode needs base/head revisions (the workflow defaults head to checked-out
+HEAD); clean worktree validation does not inspect committed change coverage.
 
 ### Mandatory Definition of Done
 

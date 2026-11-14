@@ -25,9 +25,9 @@ specialized agent definition files.
 3. Keep the root rule authoritative. Specialized agents must include
    `Post-Change Knowledge Synchronization`; skills must include
    `Maintenance & Continuous Learning`. Preserve Agent Skills YAML frontmatter.
-4. Keep `scripts/validate-agent-knowledge.pl` dependency-free. It compares
-   the Git base against `HEAD` and includes local staged, unstaged, and
-   untracked changes. Range comparisons supply an explicit base commit. Generated and
+4. Keep `scripts/validate-agent-knowledge.pl` dependency-free. Worktree scope compares
+   local staged, unstaged, and untracked changes against `HEAD`. Range scope
+   compares explicit base/head revisions from their merge base. Generated and
    user-state directories are excluded from project-change enforcement.
 5. The validator requires a non-empty content addition to an agent/skill
    instruction, checks skill frontmatter and local Markdown links, and checks
@@ -37,7 +37,10 @@ specialized agent definition files.
    perl scripts/validate-agent-knowledge.pl --scope worktree
    ```
 
-   For committed comparisons, pass `--base <base-sha>` locally.
+   For committed comparisons, pass both revisions explicitly:
+   `--scope range --base BASE_REF --head HEAD_REF`. A lone `--base` is invalid
+   in worktree scope. The manual workflow exposes range/worktree selection and
+   resolves revision inputs as Git commits before invoking the canonical tool.
 6. Validate the workflow syntax and inspect its event, permissions, checkout
    depth, base selection, and command. Run the validator and `git diff --check`.
    Do not claim CI ran locally or that structural checks establish semantic
@@ -53,12 +56,17 @@ specialized agent definition files.
 
 ## Enforcement limits
 
-- GitHub Actions runs the validator only on manual dispatch. There is no local
-  hook; contributors run the same command directly.
+- GitHub Actions workflows have only `workflow_dispatch`. Every job must require
+  the original `github.actor` and the current `github.triggering_actor` to equal
+  `github.repository_owner`, including re-runs. Manual dispatch alone does not
+  exclude collaborators with write permissions. Preserve the job-level gate
+  before checkout; do not replace it with a step after source has run. There is
+  no local hook; contributors can still run checks directly.
 - The validator cannot prove that prose is a meaningful improvement for the
   changed behavior. A human review remains required.
-- The manual check validates the checked-out worktree; range mode is available
-  for explicit committed comparisons. It does not alter branch protection settings.
+- The manual check accepts either explicit committed range comparisons or
+  checkout worktree validation. A clean worktree does not validate knowledge
+  coverage of committed changes. It does not alter branch protection settings.
 
 ## GitHub Actions pin maintenance
 
@@ -66,8 +74,10 @@ The manual-only workflow pins each external action to an immutable
 40-character commit SHA; tags and branches are not acceptable because they can
 be moved. When changing a pin, verify the release SHA first and update the
 `uses:` line and its trailing `# vX.Y.Z` comment in the same edit. Keep the
-workflow's triggers, permissions, concurrency, job names, and commands
+workflow's manual-only triggers, owner/re-run job gate, and read-only permissions
 unchanged.
+When separately authorized to change validation inputs or commands, retain safe
+environment-based argument passing and explicit scope validation.
 
 | Action | Version | Commit SHA |
 | --- | --- | --- |
@@ -76,6 +86,11 @@ unchanged.
 | `actions/cache` | `v6.1.0` | `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` |
 | `actions/setup-java` | `v6.2.0` | `77dd5b2ce225ea11469928ac317850245a74ae78` |
 | `actions/setup-node` | `v7.1.0` | `949feb2413d6458794dcd2491c4babbbce0c15c1` |
+
+The test workflow is `.github/workflows/tests.yml`: Linux Bash/Perl plus
+Windows PowerShell 5.1 and 7, offline fixtures only, no real builds/router starts.
+Keep native suites as separate steps so one script cannot accidentally mask
+another script's exit status. Do not claim an Actions run from local YAML lint.
 
 Validate a workflow edit with `actionlint .github/workflows/*.yml` and, when a
 `yamllint` configuration exists, `yamllint -c <config> .github/workflows`.

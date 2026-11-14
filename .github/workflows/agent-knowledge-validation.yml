@@ -2,6 +2,23 @@ name: Agent Knowledge Validation
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Validate committed changes (range) or checkout structure (worktree)
+        type: choice
+        options:
+          - range
+          - worktree
+        default: range
+        required: true
+      base:
+        description: Base revision for range comparison (required for range)
+        type: string
+        required: false
+      head:
+        description: Head revision for range comparison (empty uses checked-out HEAD)
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -13,6 +30,11 @@ concurrency:
 jobs:
   validate-agent-knowledge:
     name: Agent Knowledge Validation
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository history
@@ -22,5 +44,34 @@ jobs:
           persist-credentials: false
       - name: Run canonical contract tests
         run: prove tests/agent_knowledge_validator/test_validator.pl
-      - name: Run canonical worktree validation
-        run: perl scripts/validate-agent-knowledge.pl --scope worktree
+      - name: Run canonical knowledge validation
+        env:
+          VALIDATION_SCOPE: ${{ inputs.scope }}
+          VALIDATION_BASE: ${{ inputs.base }}
+          VALIDATION_HEAD: ${{ inputs.head }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          case "$VALIDATION_SCOPE" in
+            range)
+              if [[ -z "$VALIDATION_BASE" ]]; then
+                printf '%s\n' 'The base input is required for range validation.' >&2
+                exit 2
+              fi
+              base_commit="$(git rev-parse --verify --end-of-options "${VALIDATION_BASE}^{commit}")"
+              head_commit="$(git rev-parse --verify --end-of-options "${VALIDATION_HEAD:-HEAD}^{commit}")"
+              perl scripts/validate-agent-knowledge.pl --scope range \
+                --base "$base_commit" --head "$head_commit"
+              ;;
+            worktree)
+              if [[ -n "$VALIDATION_BASE" || -n "$VALIDATION_HEAD" ]]; then
+                printf '%s\n' 'Base and head inputs are only accepted with range validation.' >&2
+                exit 2
+              fi
+              perl scripts/validate-agent-knowledge.pl --scope worktree
+              ;;
+            *)
+              printf '%s\n' 'Unknown validation scope.' >&2
+              exit 2
+              ;;
+          esac

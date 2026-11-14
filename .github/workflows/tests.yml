@@ -1,0 +1,109 @@
+name: Tests (Linux and Windows)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: ${{ matrix.name }}
+    # Check the original actor and the re-run actor before allocating a runner.
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux (Bash and Perl)
+            os: ubuntu-24.04
+            family: linux
+            shell: bash
+          - name: Windows (PowerShell 5.1)
+            os: windows-2022
+            family: windows
+            shell: powershell
+          - name: Windows (PowerShell 7)
+            os: windows-2022
+            family: windows
+            shell: pwsh
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check Linux test dependencies and source syntax
+        if: matrix.family == 'linux'
+        run: |
+          for tool in bash git perl python3 jq unzip curl tar sha512sum sort; do
+            command -v "$tool" >/dev/null
+          done
+          bash -n install.bash build/build.bash build/scripts/*.bash \
+            lib/*.bash lib/backends/*.bash tests/*.bash i2pd/*.bash i2p-java/*.bash
+          jq -e . build/preferences/distribution/policies.json >/dev/null
+
+      - name: Bash localization tests
+        if: matrix.family == 'linux'
+        run: bash tests/test-i18n.bash
+      - name: Bash proxy policy tests
+        if: matrix.family == 'linux'
+        run: bash tests/test-proxy-policy.bash
+      - name: Bash router safety tests
+        if: matrix.family == 'linux'
+        run: bash tests/test-router-safety.bash
+      - name: Java configuration rollback tests
+        if: matrix.family == 'linux'
+        run: bash tests/test-router-java-config.bash
+      - name: Browser publication and lock tests
+        if: matrix.family == 'linux'
+        run: bash tests/test-build-safety.bash
+      - name: NoScript offline payload tests
+        if: matrix.family == 'linux'
+        run: bash tests/test-noscript.bash
+      - name: Agent knowledge validator contract tests
+        if: matrix.family == 'linux'
+        run: prove tests/agent_knowledge_validator/test_validator.pl
+
+      - name: Parse PowerShell source files
+        if: matrix.family == 'windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSVersionTable.PSVersion.ToString()
+          $files = @(Get-Item -LiteralPath 'install.ps1') + @(
+            Get-ChildItem -Path build, lib, tests, i2pd, i2p-java -Recurse -Filter '*.ps1' -File
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $file.FullName, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Host $_.ToString() }
+              throw "PowerShell syntax errors in $($file.FullName)"
+            }
+          }
+      - name: PowerShell localization tests
+        if: matrix.family == 'windows'
+        run: .\tests\test-i18n.ps1
+      - name: PowerShell proxy policy tests
+        if: matrix.family == 'windows'
+        run: .\tests\test-proxy-policy.ps1
+      - name: PowerShell router safety tests
+        if: matrix.family == 'windows'
+        run: .\tests\test-router-safety.ps1
+      - name: PowerShell process ownership tests
+        if: matrix.family == 'windows'
+        run: .\tests\test-router-ownership.ps1
