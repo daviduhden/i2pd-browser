@@ -34,8 +34,9 @@ management, and browser launchers.
   `I2PD_BROWSER_LANGUAGE` or legacy `language`, OS locale
   (`LANGUAGE` as a colon list, then `LC_ALL`, `LC_MESSAGES`, `LANG`),
   then `en-US`.
-- PowerShell uses the same precedence with the .NET user/current UI
-  culture for the OS step.
+- PowerShell uses the same precedence with the .NET `CultureInfo.CurrentUICulture`
+  for the OS step. Do not access a nonexistent static GetUserDefaultUICulture
+  property; the runtime initializes CurrentUICulture from the user UI language.
 - Normalization strips a suffix after `.`, replaces `_` with `-`,
   lowercases, and maps `en*` to `en-US`, `es*` to `es-ES`, `ru*` to
   `ru`, and `zh`, `zh-cn`, `zh-hans`, `zh-hans-cn` to `zh-CN`. Other
@@ -57,7 +58,8 @@ management, and browser launchers.
    placeholders without updating callers.
 3. If the message is used by both platforms, verify the Bash and
    PowerShell interpolation behavior is still acceptable.
-4. Update callers if the key meaning or argument count changes.
+4. Update callers if the key meaning or argument count changes. Keep selector
+   prompts on stderr/terminal, never stdout captured as a selected value.
 5. Run both i18n tests.
 
 ### Add a message
@@ -110,6 +112,12 @@ grep -nE '\{[0-9]+\}' locales/*.properties
 # Encoding and line endings
 file locales/*.properties
 ```
+
+Check duplicate keys, empty values and placeholder parity as well as key
+parity. PowerShell tests must cover fallback and explicit/stored/environment
+precedence with the script root initialized before importing the loader.
+For static-only authorization, inspect catalogs and tests without executing the
+suites, and report those tests as not run.
 
 If a new locale is added to the test loops, update both test files.
 Do not source or evaluate a catalog to inspect it.

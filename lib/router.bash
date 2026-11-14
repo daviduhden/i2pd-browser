@@ -196,10 +196,10 @@ router_conf_set() {
 router_select_interactive() {
 	local reply
 
-	printf '\n%s\n\n' "$(router_t prompt.router)"
-	printf '  1) %s\n' "$(router_backend_pretty i2pd)"
-	printf '  2) %s\n\n' "$(router_backend_pretty i2p-java)"
-	printf '%s ' "$(router_t prompt.choice)"
+	printf '\n%s\n\n' "$(router_t prompt.router)" >&2
+	printf '  1) %s\n' "$(router_backend_pretty i2pd)" >&2
+	printf '  2) %s\n\n' "$(router_backend_pretty i2p-java)" >&2
+	printf '%s ' "$(router_t prompt.choice)" >&2
 
 	read -r reply || reply=""
 	case "${reply:-1}" in
@@ -219,10 +219,10 @@ router_select_interactive() {
 router_select_source_interactive() {
 	local reply
 
-	printf '\n%s\n\n' "$(router_t prompt.source)"
-	printf '  1) %s\n' "$(router_t source.system)"
-	printf '  2) %s\n\n' "$(router_t source.vendored)"
-	printf '%s ' "$(router_t prompt.choice)"
+	printf '\n%s\n\n' "$(router_t prompt.source)" >&2
+	printf '  1) %s\n' "$(router_t source.system)" >&2
+	printf '  2) %s\n\n' "$(router_t source.vendored)" >&2
+	printf '%s ' "$(router_t prompt.choice)" >&2
 
 	read -r reply || reply=""
 	case "${reply:-1}" in

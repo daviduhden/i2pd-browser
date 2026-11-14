@@ -40,7 +40,7 @@ function Select-Language {
     if ($Requested) { return (ConvertTo-I2pdBrowserLocale $Requested) }
     if ((Get-I2pdBrowserStoredLocale) -or $env:I2PD_BROWSER_LANGUAGE -or
         $env:language -or $script:NonInteractive -or
-        -not [Environment]::UserInteractive) {
+        -not (Test-RouterInteractive)) {
         return (Select-I2pdBrowserLocale)
     }
     Get-I18nMessage 'prompt.language' | Write-Host
@@ -113,7 +113,7 @@ function Import-Args {
             '^--no-install-deps$' { $script:InstallDeps = $false; $index++ }
             '^(-h|--help)$' { $script:ShowHelp = $true; $index++ }
             default {
-                Write-RouterError "Unknown argument: $argument"
+                Write-RouterError (Get-I18nMessage 'error.unknown-argument' @($argument))
                 Show-Usage
                 exit 2
             }
@@ -129,7 +129,7 @@ function Select-BackendName {
     }
     $existing = Get-RouterConf
     if ($existing -and (Test-RouterBackend $existing)) { return $existing }
-    if ($script:NonInteractive -or -not [Environment]::UserInteractive) {
+    if ($script:NonInteractive -or -not (Test-RouterInteractive)) {
         return $script:I2P_ROUTER_DEFAULT
     }
     return (Select-RouterInteractive)
@@ -143,7 +143,7 @@ function Select-SourceName {
     }
     $existing = Get-RouterConfSource
     if ($existing -and (Test-RouterSource $existing)) { return $existing }
-    if ($script:NonInteractive -or -not [Environment]::UserInteractive) {
+    if ($script:NonInteractive -or -not (Test-RouterInteractive)) {
         return $script:I2P_ROUTER_SOURCE_DEFAULT
     }
     return (Select-RouterSourceInteractive)
@@ -441,7 +441,7 @@ function Invoke-DetectCommand {
                     $name, (Get-RouterState), (Get-RouterConsoleUrl))
         }
         else {
-            Write-Host ('{0,-9} {1}' -f $name, 'unavailable')
+            Write-Host ('{0,-9} {1}' -f $name, (Get-I18nMessage 'state.unavailable'))
         }
     }
 }

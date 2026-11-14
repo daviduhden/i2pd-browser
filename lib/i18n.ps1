@@ -43,7 +43,6 @@ function Get-I2pdBrowserStoredLocale {
 
 function Get-I2pdBrowserSystemLocale {
     $cultures = @(
-        [Globalization.CultureInfo]::GetUserDefaultUICulture.Name
         [Globalization.CultureInfo]::CurrentUICulture.Name
     )
     foreach ($culture in $cultures) {

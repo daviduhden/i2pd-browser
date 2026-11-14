@@ -55,7 +55,7 @@ bash tests/test-i18n.bash
 pwsh -NoProfile -File tests/test-i18n.ps1   # if available
 ```
 
-These cover catalog key parity, locale normalization, selection
+The i18n suites cover catalog key parity, locale normalization, selection
 precedence, fallback, config preservation, and the presence of
 `intl.locale.requested` in both builders. They do not test Firefox,
 downloads, policies, router lifecycle, or launchers.

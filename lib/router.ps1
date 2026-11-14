@@ -84,6 +84,10 @@ $script:BACKEND_HTTP_PROXY_PORT = ''
 $script:BACKEND_SOCKS_PROXY_HOST = ''
 $script:BACKEND_SOCKS_PROXY_PORT = ''
 
+function Test-RouterInteractive {
+    return ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected)
+}
+
 function Write-RouterLog {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Text)
     $stamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')

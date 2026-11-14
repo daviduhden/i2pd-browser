@@ -43,6 +43,9 @@ PowerShell. Use `i2p-router-integration` for backend logic and
 - The i2pd Windows backend adds a best-effort Defender exclusion for
   `i2pd.exe` and its directories. It is not a security control and must
   never become a fatal requirement.
+- Selector prompts go to stderr/terminal; stdout contains only the selected
+  identifier because the installer captures it. PowerShell interactive detection
+  also rejects redirected stdin.
 
 ## Procedure
 

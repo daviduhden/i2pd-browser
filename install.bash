@@ -12,6 +12,8 @@
 # strict mode in mind when adding optional values or sourced helper commands.
 set -Eeuo pipefail
 
+_initial_language_override="${I2PD_BROWSER_LANGUAGE:-${language:-}}"
+
 _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &&
 	pwd -P)"
 
@@ -105,7 +107,7 @@ parse_args() {
 			shift
 			;;
 		*)
-			router_error "Unknown argument: $1"
+			router_error "$(router_t error.unknown-argument "$1")"
 			usage >&2
 			exit 2
 			;;
@@ -120,12 +122,12 @@ choose_language() {
 		printf '%s\n' "$selected"
 		return 0
 	fi
-	if [[ -n $(i18n_stored_locale) || -n ${I2PD_BROWSER_LANGUAGE:-${language:-}} ]] ||
+	if [[ -n $(i18n_stored_locale) || -n $_initial_language_override ]] ||
 		((non_interactive == 1)) || [[ ! -t 0 ]]; then
 		i18n_select_locale
 		return 0
 	fi
-	router_t prompt.language
+	router_t prompt.language >&2
 	read -r reply || reply=""
 	case "${reply:-1}" in
 	1 | en-US) printf 'en-US\n' ;;
