@@ -78,3 +78,15 @@ or install router packages.
 The **Agent Knowledge Validation** workflow has the same owner-only/manual gate
 and retains its separate range/worktree inputs. A successful CI test run is not
 a browser build, a real process-lifecycle test, or a runtime leak audit.
+
+Validate workflow changes locally with all three linters:
+
+```sh
+actionlint .github/workflows/*.yml
+yamllint --strict .github/workflows/*.yml
+zizmor --offline --no-progress .github/workflows/*.yml
+```
+
+The default yamllint rules apply, including document start markers, quoted `on`,
+and the 80-character line limit. Zizmor offline mode omits online audits and does
+not verify remote action metadata. These checks do not execute GitHub Actions.

@@ -83,6 +83,9 @@ shfmt -d install.bash build/build.bash build/scripts/*.bash \
   lib/*.bash lib/backends/*.bash tests/*.bash i2pd/*.bash \
   i2p-java/*.bash
 jq -e . build/preferences/distribution/policies.json
+actionlint .github/workflows/*.yml
+yamllint --strict .github/workflows/*.yml
+zizmor --offline --no-progress .github/workflows/*.yml
 perl scripts/validate-agent-knowledge.pl --scope worktree
 git diff --check
 ```

@@ -92,8 +92,19 @@ Windows PowerShell 5.1 and 7, offline fixtures only, no real builds/router start
 Keep native suites as separate steps so one script cannot accidentally mask
 another script's exit status. Do not claim an Actions run from local YAML lint.
 
-Validate a workflow edit with `actionlint .github/workflows/*.yml` and, when a
-`yamllint` configuration exists, `yamllint -c <config> .github/workflows`.
+Validate every workflow edit with all three available tools:
+
+```sh
+actionlint .github/workflows/*.yml
+yamllint --strict .github/workflows/*.yml
+zizmor --offline --no-progress .github/workflows/*.yml
+```
+
+Use yamllint's default rules without disabling findings: include `---`, quote the
+`on` key for YAML 1.1 compatibility, and wrap long YAML and embedded script lines.
+Keep the checkout version comment adjacent to its immutable pin when wrapping.
+Zizmor offline mode does not perform online audits or verify remote action
+metadata; report that limit and do not describe a lint run as executing CI.
 
 ## Maintenance & Continuous Learning
 
