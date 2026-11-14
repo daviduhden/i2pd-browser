@@ -20,6 +20,9 @@ _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &&
 # shellcheck source=lib/router.bash
 # shellcheck disable=SC1091
 source "$_script_dir/lib/router.bash"
+# shellcheck source=lib/browser-policy.bash
+# shellcheck disable=SC1091
+source "$_script_dir/lib/browser-policy.bash"
 
 PROXY_TIMEOUT="${PROXY_TIMEOUT:-90}"
 
@@ -266,7 +269,8 @@ build_browser_if_needed() {
 		[[ -r $policies ]] && command -v jq >/dev/null 2>&1; then
 		got_http="$(jq -r '.policies.Proxy.HTTPProxy // empty' "$policies")"
 		got_ssl="$(jq -r '.policies.Proxy.SSLProxy // empty' "$policies")"
-		if [[ $got_http == "$expected" && $got_ssl == "$expected" ]]; then
+		if [[ $got_http == "$expected" && $got_ssl == "$expected" ]] &&
+			browser_policy_validate "$policies" "$expected"; then
 			router_log "$(router_t info.bundle-built)"
 			if build_inputs_newer; then
 				router_warn "$(router_t warn.build-inputs-newer)"
@@ -284,7 +288,7 @@ build_browser_if_needed() {
 
 validate_browser_proxy() {
 	local policies="$I2PD_BROWSER_ROOT/browser"
-	local expected got_http got_ssl
+	local expected
 
 	policies+="/distribution/policies.json"
 	expected="$(router_http_proxy)"
@@ -295,15 +299,10 @@ validate_browser_proxy() {
 		return 0
 	fi
 
-	if command -v jq >/dev/null 2>&1; then
-		got_http="$(jq -r '.policies.Proxy.HTTPProxy // empty' "$policies")"
-		got_ssl="$(jq -r '.policies.Proxy.SSLProxy // empty' "$policies")"
-		if [[ $got_http != "$expected" || $got_ssl != "$expected" ]]; then
-			router_warn "The Firefox proxy ($got_http / $got_ssl) does not match the" \
-				"selected router proxy ($expected);" \
-				"rebuild the browser."
-			return 1
-		fi
+	if ! command -v jq >/dev/null 2>&1 ||
+		! browser_policy_validate "$policies" "$expected"; then
+		router_error "$(router_t error.effective-config "$policies")"
+		return 1
 	fi
 
 	router_log "$(router_t info.proxy "$expected")"

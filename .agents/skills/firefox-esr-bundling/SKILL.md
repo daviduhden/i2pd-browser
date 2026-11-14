@@ -155,6 +155,9 @@ change. Use a disposable clone or a backed-up profile.
 - **Plugin/extension assumptions.** NoScript is sideloaded at
   application level, not enforced by an `ExtensionSettings` policy.
 
+Use `lib/browser-policy.*` for policy generation and validation in builders and
+regression tests. Do not repeat its jq transformation inside tests.
+
 ## References
 
 - `build/build.bash` - Linux pipeline, staging, checksum, validation.

@@ -290,30 +290,8 @@ function Install-NoScript {
 }
 
 function Format-PoliciesJson {
-    # Format the copy in the built browser so the tracked source file is
-    # never rewritten (ConvertTo-Json escapes differently from jq).
     $policies = Join-Path $script:BrowserDir 'distribution\policies.json'
-    Write-BuildLog (Get-I18nMessage 'info.build.configuring')
-    if (-not (Test-Path $policies)) {
-        Stop-Build 'Firefox policies.json is missing.'
-    }
-    try {
-        $data = Get-Content $policies -Raw | ConvertFrom-Json
-    }
-    catch {
-        Stop-Build "Could not parse $policies."
-    }
-    if (-not (Test-RouterProxySettings)) {
-        Stop-Build 'Proxy overrides must use 127.0.0.1 and ports from 1 to 65535.'
-    }
-    $endpoint = Get-RouterHttpProxy
-    $data.policies.Proxy.HTTPProxy = $endpoint
-    $data.policies.Proxy.SSLProxy = $endpoint
-    $json = $data | ConvertTo-Json -Depth 100
-    # Write UTF-8 without a BOM: Windows PowerShell 5.1 adds one with
-    # Set-Content -Encoding utf8.
-    $utf8 = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($policies, $json, $utf8)
+    Write-BrowserProxyPolicy -InputPath $policies -OutputPath $policies -Endpoint (Get-RouterHttpProxy)
 }
 
 function Copy-StandardConfigs {
@@ -451,6 +429,7 @@ function Main {
 
 # Router helpers used above are defined in lib/router.ps1.
 . (Join-Path $script:RepoRoot 'lib/router.ps1')
+. (Join-Path $script:RepoRoot 'lib/browser-policy.ps1')
 
 Main @args
 exit 0

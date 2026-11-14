@@ -15,6 +15,7 @@ $script:InstallDir = (
     Resolve-Path (Split-Path -Parent $PSCommandPath)
 ).Path
 . (Join-Path $script:InstallDir 'lib/router.ps1')
+. (Join-Path $script:InstallDir 'lib/browser-policy.ps1')
 
 $script:ProxyTimeout = 90
 if ($env:PROXY_TIMEOUT) { $script:ProxyTimeout = [int]$env:PROXY_TIMEOUT }
@@ -235,7 +236,8 @@ function Build-BrowserIfNeeded {
         }
         if ($currentPolicy -and
             $currentPolicy.policies.Proxy.HTTPProxy -eq $expectedProxy -and
-            $currentPolicy.policies.Proxy.SSLProxy -eq $expectedProxy) {
+            $currentPolicy.policies.Proxy.SSLProxy -eq $expectedProxy -and
+            (Test-BrowserProxyPolicy -Path $policies -Endpoint $expectedProxy)) {
         Write-RouterLog 'The Firefox ESR bundle is already built.'
         if (Test-BuildInputsNewer) {
             Write-RouterWarn (Get-I18nMessage 'warn.build-inputs-newer')
@@ -258,17 +260,8 @@ function Test-BrowserProxy {
         Write-RouterWarn 'No built browser configuration to validate.'
         return $true
     }
-    try {
-        $config = Get-Content $policies -Raw | ConvertFrom-Json
-    }
-    catch {
-        Write-RouterWarn "Could not parse the built Firefox policies at $policies."
-        return $false
-    }
-    $gotHttp = $config.policies.Proxy.HTTPProxy
-    $gotSsl = $config.policies.Proxy.SSLProxy
-    if ($gotHttp -ne $expected -or $gotSsl -ne $expected) {
-        Write-RouterWarn "The Firefox proxy ($gotHttp / $gotSsl) does not match the selected router proxy ($expected); rebuild the browser."
+    if (-not (Test-BrowserProxyPolicy -Path $policies -Endpoint $expected)) {
+        Write-RouterError (Get-I18nMessage 'error.effective-config' @($policies))
         return $false
     }
     Write-RouterLog "Firefox proxy endpoint: $expected"

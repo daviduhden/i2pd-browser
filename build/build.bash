@@ -22,6 +22,8 @@ i18n_init
 # manager so the generated Firefox policy follows any loopback override.
 # shellcheck disable=SC1091
 source "$I2PD_BROWSER_ROOT/lib/router.bash"
+# shellcheck disable=SC1091
+source "$I2PD_BROWSER_ROOT/lib/browser-policy.bash"
 
 # With errtrace enabled, report failures from nested functions as well as main.
 trap 'error "Unhandled error at line $LINENO."' ERR
@@ -316,18 +318,8 @@ copy_standard_configs() {
 }
 
 format_distribution_policy_json() {
-	local json_file="$staging_dir/distribution/policies.json"
-	local tmp_json_file="${json_file}.tmp"
-	local http_proxy
-	http_proxy="$(router_http_proxy)"
-
-	log "$(i18n_message info.build.configuring)"
-	jq --arg endpoint "$http_proxy" \
-		'.policies.Proxy.HTTPProxy = $endpoint |
-		 .policies.Proxy.SSLProxy = $endpoint' \
-		"$json_file" >"$tmp_json_file"
-	cat "$tmp_json_file" >"$json_file"
-	rm -f "$tmp_json_file"
+	browser_policy_generate "$staging_dir/distribution/policies.json" \
+		"$staging_dir/distribution/policies.json" "$(router_http_proxy)"
 }
 
 validate_bundle() {
@@ -359,14 +351,7 @@ validate_bundle() {
 	# The profile selects manual mode; the generated enterprise policy carries
 	# the endpoint. Refuse to publish if its HTTP/SSL endpoints differ from the
 	# router endpoint selected for this build.
-	jq --arg expected_proxy "$expected_proxy" -e '
-		.policies.Proxy.Mode == "manual" and
-		.policies.Proxy.Locked == true and
-		.policies.Proxy.HTTPProxy == $expected_proxy and
-		.policies.Proxy.SSLProxy == $expected_proxy and
-		.policies.Proxy.UseProxyForDNS == true and
-		.policies.Proxy.Passthrough == ""
-	' "$staging_dir/distribution/policies.json" >/dev/null ||
+	browser_policy_validate "$staging_dir/distribution/policies.json" "$expected_proxy" ||
 		die "$(i18n_message error.bundle-validation "Proxy policy")"
 }
 
