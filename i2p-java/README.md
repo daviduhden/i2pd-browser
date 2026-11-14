@@ -6,9 +6,10 @@ backend.
     config/   Vendored, versioned configuration (static files only).
     data/     Effective configuration and runtime state. Seeded from
               config/ by the installer or launcher when a file is
-              missing, then ignored by Git. Existing files are never
-              overwritten; update data/ explicitly to apply a config
-              change to an existing installation.
+              missing, then ignored by Git. Seeding never overwrites existing
+              files. Explicit validated proxy overrides update effective
+              endpoint settings; other seed changes require deliberate
+              maintenance of the existing data/ configuration.
 
 The `i2p-java.bash` launcher starts the system I2P installation directly
 with `-Di2p.dir.config=data`, so the router never touches the user's

@@ -521,7 +521,19 @@ function Test-RouterInstalled { return (Get-BackendIsInstalled) }
 function Test-RouterRunning { return (Get-BackendIsRunning) }
 function Test-RouterManaged { return (Get-BackendIsManaged) }
 function Test-RouterMisconfigured { return (Get-BackendIsMisconfigured) }
-function Invoke-RouterPrepareConfig { return (Initialize-BackendConfig) }
+function Assert-RouterProxySettings {
+    if (-not (Test-RouterProxySettings)) {
+        Write-RouterError (Get-I18nMessage 'error.proxy-settings')
+        return $false
+    }
+    return $true
+}
+
+function Invoke-RouterPrepareConfig {
+    if (-not (Assert-RouterProxySettings)) { return $false }
+    if (-not (Initialize-BackendConfig)) { return $false }
+    return (Test-BackendConfig)
+}
 function Get-RouterDependencyHint { return (Get-BackendDependencyHint) }
 function Install-RouterDependencies { return (Install-BackendDependencies) }
 function Install-RouterVendor { return (Install-BackendVendor) }
@@ -536,11 +548,9 @@ function Get-RouterState {
 # Leave an already-running unmanaged router untouched; it may be owned by a
 # system service or another user-controlled launch path.
 function Start-Router {
-    if (-not (Test-RouterProxySettings)) {
-        Write-RouterError 'Proxy overrides must use 127.0.0.1 and ports from 1 to 65535.'
-        return $false
-    }
+    if (-not (Assert-RouterProxySettings)) { return $false }
     if (Get-BackendIsRunning) {
+        if (-not (Test-BackendConfig)) { return $false }
         if (Get-BackendIsManaged) {
             Write-RouterLog 'The I2P router is already running (managed by I2Pd Browser).'
         }
@@ -559,6 +569,7 @@ function Start-Router {
         Get-BackendDependencyHint | Write-Host
         return $false
     }
+    if (-not (Invoke-RouterPrepareConfig)) { return $false }
     return (Start-Backend)
 }
 

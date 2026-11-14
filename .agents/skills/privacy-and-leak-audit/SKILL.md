@@ -45,7 +45,8 @@ test.
 ## Procedure
 
 1. List every changed pref, policy, router option, URL, and launcher
-   environment change. For each, name the traffic path it creates or
+   environment change. Validate overrides before any configuration writes and
+   validate effective saved listener files before startup. For each, name the traffic path it creates or
    removes.
 2. Confirm that the proxy endpoint still exists in the generated policy,
    not only as a manual proxy mode pref. The endpoint is set in

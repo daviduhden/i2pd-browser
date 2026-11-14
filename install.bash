@@ -352,6 +352,7 @@ cmd_install() {
 	# actually available and its configuration can be prepared.
 	ROUTER_SOURCE="$source"
 	router_load_backend "$backend" || exit 1
+	router_require_proxy_settings || exit 1
 	ensure_backend_available || exit 1
 	router_prepare_config || exit 1
 	router_conf_set "$backend" "$source" "$selected_language" || exit 1

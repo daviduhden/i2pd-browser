@@ -13,5 +13,5 @@ $script:Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $script:Root 'lib/router.ps1')
 
 if (-not (Import-RouterBackend 'i2p-java')) { exit 1 }
-Invoke-RouterPrepareConfig | Out-Null
+if (-not (Invoke-RouterPrepareConfig)) { exit 1 }
 if (-not (Start-Router)) { exit 1 }

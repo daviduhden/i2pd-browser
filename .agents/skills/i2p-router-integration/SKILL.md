@@ -129,6 +129,15 @@ delete its PID file, or remove its data directory.
   dependency hint accurate.
 - **Vendored I2P (Java) installer.** It is interactive and requires a trusted
   supplied checksum. Automation must not pretend it is unattended or signed.
+- **Effective configuration.** Validate supported configuration syntax, duplicate
+  keys, loopback binds, and endpoint agreement before startup. Java overrides
+  stage the related files and restore originals on ordinary publication failure;
+  the accepted Properties subset requires unique canonical ASCII keys with `=`,
+  without whitespace aliases, escaped keys, or continued lines. Reject unsupported
+  syntax for review rather than silently guessing upstream interpretation;
+  a power failure can still require manual recovery.
+- **Linux vendor compatibility.** A Debian binary may depend on host libraries.
+  Verify executable capability and the target ABI; extraction is not runtime proof.
 - **Port drift.** The router configs, shared defaults, Firefox policy,
   and documentation are separate sources of truth. Update all of them.
 - **Configuration write failures.** Bash writes the config through a

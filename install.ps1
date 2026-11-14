@@ -309,6 +309,7 @@ function Invoke-Install {
     # actually available and its configuration can be prepared.
     $script:ROUTER_SOURCE = $source
     if (-not (Import-RouterBackend $backend)) { exit 1 }
+    if (-not (Assert-RouterProxySettings)) { exit 1 }
     if (-not (Confirm-BackendAvailable)) { exit 1 }
     if (-not (Invoke-RouterPrepareConfig)) { exit 1 }
     if (-not (Set-RouterConf -Name $backend -Source $source -Language $locale)) { exit 1 }

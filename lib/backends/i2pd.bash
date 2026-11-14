@@ -240,6 +240,52 @@ backend_console_url() {
 	printf 'http://127.0.0.1:%s/\n' "$BACKEND_CONSOLE_PORT"
 }
 
+# Read only the listener sections controlled by this bundle. Reject duplicate
+# settings and effective endpoints that differ from the selected proxy policy.
+backend_config_proxy_port() {
+	local section="$1"
+	awk -v wanted="$section" '
+		/^[[:space:]]*\[/ { section=$0; gsub(/[[:space:]\[\]]/, "", section) }
+		section == wanted && /^[[:space:]]*port[[:space:]]*=/ {
+			sub(/^[^=]*=[[:space:]]*/, ""); sub(/[[:space:]]*$/, ""); print; count++
+		}
+		END { if (count != 1) exit 1 }
+	' "$BACKEND_DIR/i2pd.conf"
+}
+
+backend_validate_config() {
+	local section key value records
+	records="$(awk '
+		/^[[:space:]]*([#;]|$)/ { next }
+		/^[[:space:]]*\[/ { section=$0; gsub(/[[:space:]\[\]]/, "", section); next }
+		section ~ /^(http|httpproxy|socksproxy|sam)$/ && /=/ {
+			key=$0; sub(/=.*/, "", key); gsub(/[[:space:]]/, "", key)
+			value=$0; sub(/^[^=]*=/, "", value); gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+			if (key ~ /^(address|port)$/) {
+				if (seen[section SUBSEP key]++) exit 1
+				print section " " key " " value
+			}
+		}
+		END {
+			n=split("http httpproxy socksproxy sam", sections, " ")
+			for (i=1;i<=n;i++) if (!seen[sections[i] SUBSEP "address"] || !seen[sections[i] SUBSEP "port"]) exit 1
+		}' "$BACKEND_DIR/i2pd.conf")" || {
+		router_error "$(router_t error.effective-config "$BACKEND_DIR/i2pd.conf")"
+		return 1
+	}
+	while read -r section key value; do
+		if [[ $key == address ]]; then
+			[[ $value == 127.0.0.1 ]] || return 1
+		else
+			router_validate_proxy_endpoint 127.0.0.1 "$value" || return 1
+			case "$section" in
+			httpproxy) [[ -n $ROUTER_HTTP_PROXY_OVERRIDE || $value == "$(router_http_proxy_port)" ]] || return 1 ;;
+			socksproxy) [[ -n $ROUTER_SOCKS_PROXY_OVERRIDE || $value == "$(router_socks_proxy_port)" ]] || return 1 ;;
+			esac
+		fi
+	done <<<"$records"
+}
+
 backend_prepare_config() {
 	if [[ ! -r "$BACKEND_DIR/i2pd.conf" ]]; then
 		router_error "i2pd configuration not found:" \

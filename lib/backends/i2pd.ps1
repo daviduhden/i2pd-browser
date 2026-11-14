@@ -84,6 +84,50 @@ function script:Get-BackendConsoleUrl {
     return "http://127.0.0.1:$script:BACKEND_CONSOLE_PORT/"
 }
 
+function script:Get-BackendConfigProxyPort {
+    param([string]$Section)
+    $current = ''
+    $values = @()
+    foreach ($line in [IO.File]::ReadAllLines((Join-Path $script:BACKEND_DIR 'i2pd.conf'))) {
+        if ($line -match '^\s*\[([^]]+)\]\s*$') { $current = $Matches[1] }
+        if ($current -eq $Section -and $line -match '^\s*port\s*=\s*(.*?)\s*$') { $values += $Matches[1] }
+    }
+    if ($values.Count -ne 1) { throw 'Invalid proxy configuration' }
+    return $values[0]
+}
+
+function script:Test-BackendConfig {
+    $file = Join-Path $script:BACKEND_DIR 'i2pd.conf'
+    $values = @{}
+    $section = ''
+    try {
+        foreach ($line in [IO.File]::ReadAllLines($file)) {
+            if ($line -match '^\s*\[([^]]+)\]\s*$') { $section = $Matches[1]; continue }
+            if ($section -in @('http', 'httpproxy', 'socksproxy', 'sam') -and
+                $line -match '^\s*(address|port)\s*=\s*(.*?)\s*$') {
+                $key = "$section.$($Matches[1])"
+                if ($values.ContainsKey($key)) { return $false }
+                $values[$key] = $Matches[2]
+            }
+        }
+        foreach ($section in @('http', 'httpproxy', 'socksproxy', 'sam')) {
+            if ($values["$section.address"] -ne '127.0.0.1' -or
+                -not (Test-RouterProxyEndpoint '127.0.0.1' $values["$section.port"])) {
+                return $false
+            }
+        }
+        if (-not ($script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE) -and
+            $values['httpproxy.port'] -ne (Get-RouterHttpProxyPort)) { return $false }
+        if (-not ($script:ROUTER_SOCKS_PROXY_HOST_OVERRIDE -or $script:ROUTER_SOCKS_PROXY_PORT_OVERRIDE) -and
+            $values['socksproxy.port'] -ne (Get-RouterSocksProxyPort)) { return $false }
+        return $true
+    }
+    catch {
+        Write-RouterError (Get-I18nMessage 'error.effective-config' @($file))
+        return $false
+    }
+}
+
 function script:Initialize-BackendConfig {
     $conf = Join-Path $script:BACKEND_DIR 'i2pd.conf'
     if (-not (Test-Path $conf)) {

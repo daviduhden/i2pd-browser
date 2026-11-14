@@ -332,7 +332,7 @@ i2p_java_set_config_value() {
 		BEGIN { prefix = key "=" }
 		index($0, prefix) == 1 { print prefix value; found++; next }
 		{ print }
-		END { if (!found) exit 1 }
+		END { if (found != 1) exit 1 }
 	' "$file" >"$tmp"; then
 		mv "$tmp" "$file"
 	else
@@ -344,35 +344,156 @@ i2p_java_set_config_value() {
 # Apply explicit endpoint overrides only to effective runtime files. The
 # tracked config/ templates and existing user values remain untouched when
 # the corresponding environment override is absent.
+# Java Properties supports aliases, escapes and continuations. This manager
+# accepts a deliberately narrow canonical subset instead of guessing how a
+# router will resolve ambiguous or duplicate keys. Values may contain '='.
+i2p_java_validate_properties() {
+	awk '
+		/^[[:space:]]*([#!]|$)/ { next }
+		{ sub(/\r$/, "") }
+		!/^[A-Za-z0-9_.-]+=/ { exit 1 }
+		{ key=$0; sub(/=.*/, "", key); if (seen[key]++) exit 1 }
+		/\\$/ { exit 1 }
+	' "$1"
+}
+
+i2p_java_config_value() {
+	local file="$1" key="$2"
+	awk -v key="$key" '
+		index($0, key "=") == 1 { value=substr($0,length(key)+2); count++ }
+		END { if (count != 1) exit 1; sub(/\r$/, "", value); print value }
+	' "$file"
+}
+
+# Validate the effective files, falling back to templates only before seeding.
+# All configured tunnel interfaces must remain local, including user additions.
+i2p_java_validate_config_dir() {
+	local dir="$1" file key value expected
+	for file in i2ptunnel.config clients.config addressbook/config.txt router.config; do
+		i2p_java_validate_properties "$dir/$file" || return 1
+	done
+	for key in tunnel.0.interface tunnel.1.interface; do
+		value="$(i2p_java_config_value "$dir/i2ptunnel.config" "$key")" || return 1
+		[[ $value == 127.0.0.1 ]] || return 1
+	done
+	while IFS='=' read -r key value; do
+		value="${value%$'\r'}"
+		if [[ $key =~ ^tunnel\.[0-9]+\.interface$ ]]; then
+			[[ $value == 127.0.0.1 || $value == ::1 ]] || return 1
+		fi
+	done <"$dir/i2ptunnel.config"
+	for key in tunnel.0.listenPort tunnel.1.listenPort; do
+		value="$(i2p_java_config_value "$dir/i2ptunnel.config" "$key")" || return 1
+		router_validate_proxy_endpoint 127.0.0.1 "$value" || return 1
+		expected="$(router_http_proxy_port)"
+		[[ $key == tunnel.0.listenPort ]] || expected="$(router_socks_proxy_port)"
+		[[ $value == "$expected" ]] || return 1
+	done
+	value="$(i2p_java_config_value "$dir/clients.config" clientApp.0.args)" || return 1
+	[[ $value == '7657 ::1,127.0.0.1 ./webapps/' ]] || return 1
+	for file in addressbook/config.txt router.config; do
+		if [[ $file == router.config ]]; then
+			key=router.updateProxyHost
+		else
+			key=proxy_host
+		fi
+		value="$(i2p_java_config_value "$dir/$file" "$key")" || return 1
+		[[ $value == 127.0.0.1 ]] || return 1
+		if [[ $file == router.config ]]; then key=router.updateProxyPort; else key=proxy_port; fi
+		value="$(i2p_java_config_value "$dir/$file" "$key")" || return 1
+		[[ $value == "$(router_http_proxy_port)" ]] || return 1
+	done
+}
+
+backend_config_proxy_port() {
+	local key=tunnel.0.listenPort dir="$BACKEND_CONFIG_DIR"
+	[[ $1 == httpproxy ]] || key=tunnel.1.listenPort
+	[[ ! -d $BACKEND_DATA_DIR ]] || dir="$BACKEND_DATA_DIR"
+	i2p_java_config_value "$dir/i2ptunnel.config" "$key"
+}
+
+backend_validate_config() {
+	local dir="$BACKEND_CONFIG_DIR"
+	[[ ! -d $BACKEND_DATA_DIR ]] || dir="$BACKEND_DATA_DIR"
+	if ! i2p_java_validate_config_dir "$dir"; then
+		router_error "$(router_t error.effective-config "$dir")"
+		return 1
+	fi
+}
+
+# Stage the complete related configuration set before replacing any file.
+# Backups remain available until every rename has succeeded.
 i2p_java_apply_proxy_overrides() {
-	local http_host http_port socks_host socks_port entry file key value
+	local http_host http_port socks_host socks_port entry file key value stage restored_file
+	local -a files=(i2ptunnel.config addressbook/config.txt router.config)
+	[[ -n $ROUTER_HTTP_PROXY_OVERRIDE || -n $ROUTER_SOCKS_PROXY_OVERRIDE ]] || return 0
+	router_require_proxy_settings || return 1
+	stage="$(mktemp -d "$BACKEND_DATA_DIR/.proxy-config.XXXXXX")" || return 1
+	mkdir -p "$stage/new/addressbook" "$stage/old/addressbook" || {
+		rm -rf "$stage"
+		return 1
+	}
+	for file in "${files[@]}" clients.config; do
+		cp -p "$BACKEND_DATA_DIR/$file" "$stage/new/$file" || {
+			rm -rf "$stage"
+			return 1
+		}
+	done
+	for file in "${files[@]}"; do
+		cp -p "$BACKEND_DATA_DIR/$file" "$stage/old/$file" || {
+			rm -rf "$stage"
+			return 1
+		}
+	done
 	if [[ -n $ROUTER_HTTP_PROXY_OVERRIDE ]]; then
 		http_host="$(router_http_proxy_host)"
 		http_port="$(router_http_proxy_port)"
 		for entry in \
-			"$BACKEND_DATA_DIR/i2ptunnel.config|tunnel.0.interface|$http_host" \
-			"$BACKEND_DATA_DIR/i2ptunnel.config|tunnel.0.listenPort|$http_port" \
-			"$BACKEND_DATA_DIR/addressbook/config.txt|proxy_host|$http_host" \
-			"$BACKEND_DATA_DIR/addressbook/config.txt|proxy_port|$http_port" \
-			"$BACKEND_DATA_DIR/router.config|router.updateProxyHost|$http_host" \
-			"$BACKEND_DATA_DIR/router.config|router.updateProxyPort|$http_port"; do
+			"i2ptunnel.config|tunnel.0.interface|$http_host" \
+			"i2ptunnel.config|tunnel.0.listenPort|$http_port" \
+			"addressbook/config.txt|proxy_host|$http_host" \
+			"addressbook/config.txt|proxy_port|$http_port" \
+			"router.config|router.updateProxyHost|$http_host" \
+			"router.config|router.updateProxyPort|$http_port"; do
 			IFS='|' read -r file key value <<<"$entry"
-			i2p_java_set_config_value "$file" "$key" "$value" || return 1
+			i2p_java_set_config_value "$stage/new/$file" "$key" "$value" || {
+				rm -rf "$stage"
+				return 1
+			}
 		done
 	fi
 	if [[ -n $ROUTER_SOCKS_PROXY_OVERRIDE ]]; then
 		socks_host="$(router_socks_proxy_host)"
 		socks_port="$(router_socks_proxy_port)"
-		i2p_java_set_config_value "$BACKEND_DATA_DIR/i2ptunnel.config" \
-			tunnel.1.interface "$socks_host" || return 1
-		i2p_java_set_config_value "$BACKEND_DATA_DIR/i2ptunnel.config" \
-			tunnel.1.listenPort "$socks_port" || return 1
+		if ! i2p_java_set_config_value "$stage/new/i2ptunnel.config" tunnel.1.interface "$socks_host" ||
+			! i2p_java_set_config_value "$stage/new/i2ptunnel.config" tunnel.1.listenPort "$socks_port"; then
+			rm -rf "$stage"
+			return 1
+		fi
 	fi
+	i2p_java_validate_config_dir "$stage/new" || {
+		rm -rf "$stage"
+		return 1
+	}
+	for file in "${files[@]}"; do
+		if ! mv "$stage/new/$file" "$BACKEND_DATA_DIR/$file"; then
+			for restored_file in "${files[@]}"; do
+				cp -p "$stage/old/$restored_file" "$BACKEND_DATA_DIR/$restored_file" || {
+					router_error "$(router_t error.effective-config "$stage/old")"
+					return 1
+				}
+			done
+			rm -rf "$stage"
+			return 1
+		fi
+	done
+	rm -rf "$stage"
 }
 
 # Seed only missing files so first-run defaults do not overwrite effective
 # settings or runtime state. Keep newly created data private.
 backend_prepare_config() {
+	router_require_proxy_settings || return 1
 	local src="$BACKEND_CONFIG_DIR"
 	local dst="$BACKEND_DATA_DIR"
 	local file rel
@@ -388,13 +509,13 @@ backend_prepare_config() {
 	if ! (
 		umask 077
 
-		mkdir -p "$dst"
+		mkdir -p "$dst" || exit 1
 
 		while IFS= read -r -d '' file; do
 			rel="${file#"$src"/}"
-			mkdir -p "$dst/$(dirname "$rel")"
+			mkdir -p "$dst/$(dirname "$rel")" || exit 1
 			if [[ ! -e "$dst/$rel" ]]; then
-				cp "$file" "$dst/$rel"
+				cp "$file" "$dst/$rel" || exit 1
 			fi
 		done < <(find "$src" -type f -print0)
 

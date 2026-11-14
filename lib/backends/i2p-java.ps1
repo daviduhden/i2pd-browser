@@ -184,14 +184,85 @@ function script:Set-I2pJavaConfigValue {
     return $true
 }
 
-function script:Set-I2pJavaProxyOverrides {
-    $tunnels = Join-Path $script:BACKEND_DATA_DIR 'i2ptunnel.config'
+# Restrict Java Properties to canonical, unescaped, unique keys. Reject
+# continuation syntax so hidden aliases cannot bypass listener validation.
+function script:Test-I2pJavaProperties {
+    param([string]$Path)
+    $keys = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($line in [IO.File]::ReadAllLines($Path)) {
+        if ($line -match '^\s*([#!]|$)') { continue }
+        if ($line -cnotmatch '^([A-Za-z0-9_.-]+)=' -or $line.EndsWith('\')) { return $false }
+        if (-not $keys.Add($Matches[1])) { return $false }
+    }
+    return $true
+}
+
+function script:Get-I2pJavaConfigValue {
+    param([string]$Path, [string]$Key)
+    $pattern = '^' + [regex]::Escape($Key) + '=(.*)$'
+    $found = @([IO.File]::ReadAllLines($Path) | Where-Object { $_ -cmatch $pattern })
+    if ($found.Count -ne 1) { throw "Invalid configuration key: $Key" }
+    return $found[0].Substring($Key.Length + 1)
+}
+
+function script:Test-I2pJavaConfigDirectory {
+    param([string]$Directory)
+    try {
+        foreach ($file in @('i2ptunnel.config', 'clients.config', 'addressbook/config.txt', 'router.config')) {
+            if (-not (Test-I2pJavaProperties (Join-Path $Directory $file))) { return $false }
+        }
+        $tunnels = Join-Path $Directory 'i2ptunnel.config'
+        foreach ($key in @('tunnel.0.interface', 'tunnel.1.interface')) {
+            if ((Get-I2pJavaConfigValue $tunnels $key) -ne '127.0.0.1') { return $false }
+        }
+        foreach ($line in [IO.File]::ReadAllLines($tunnels)) {
+            if ($line -match '^tunnel\.[0-9]+\.interface=(.*)$' -and
+                $Matches[1] -notin @('127.0.0.1', '::1')) { return $false }
+        }
+        if ((Get-I2pJavaConfigValue $tunnels 'tunnel.0.listenPort') -ne (Get-RouterHttpProxyPort) -or
+            (Get-I2pJavaConfigValue $tunnels 'tunnel.1.listenPort') -ne (Get-RouterSocksProxyPort)) { return $false }
+        if ((Get-I2pJavaConfigValue (Join-Path $Directory 'clients.config') 'clientApp.0.args') -ne
+            '7657 ::1,127.0.0.1 ./webapps/') { return $false }
+        foreach ($entry in @(
+            @('addressbook/config.txt', 'proxy_host', 'proxy_port'),
+            @('router.config', 'router.updateProxyHost', 'router.updateProxyPort')
+        )) {
+            $file = Join-Path $Directory $entry[0]
+            if ((Get-I2pJavaConfigValue $file $entry[1]) -ne '127.0.0.1' -or
+                (Get-I2pJavaConfigValue $file $entry[2]) -ne (Get-RouterHttpProxyPort)) { return $false }
+        }
+        return $true
+    }
+    catch { return $false }
+}
+
+function script:Get-BackendConfigProxyPort {
+    param([string]$Section)
+    $directory = $script:BACKEND_CONFIG_DIR
+    if (Test-Path $script:BACKEND_DATA_DIR) { $directory = $script:BACKEND_DATA_DIR }
+    $key = if ($Section -eq 'httpproxy') { 'tunnel.0.listenPort' } else { 'tunnel.1.listenPort' }
+    return (Get-I2pJavaConfigValue (Join-Path $directory 'i2ptunnel.config') $key)
+}
+
+function script:Test-BackendConfig {
+    $directory = $script:BACKEND_CONFIG_DIR
+    if (Test-Path $script:BACKEND_DATA_DIR) { $directory = $script:BACKEND_DATA_DIR }
+    if (-not (Test-I2pJavaConfigDirectory $directory)) {
+        Write-RouterError (Get-I18nMessage 'error.effective-config' @($directory))
+        return $false
+    }
+    return $true
+}
+
+function script:Set-I2pJavaStagedProxyOverrides {
+    param([string]$Directory)
+    $tunnels = Join-Path $Directory 'i2ptunnel.config'
     if ($script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or
         $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE) {
         $hostName = Get-RouterHttpProxyHost
         $port = Get-RouterHttpProxyPort
-        $addressBook = Join-Path $script:BACKEND_DATA_DIR 'addressbook/config.txt'
-        $routerConfig = Join-Path $script:BACKEND_DATA_DIR 'router.config'
+        $addressBook = Join-Path $Directory 'addressbook/config.txt'
+        $routerConfig = Join-Path $Directory 'router.config'
         if (-not (Set-I2pJavaConfigValue -Path $tunnels `
                     -Key 'tunnel.0.interface' -Value $hostName)) { return $false }
         if (-not (Set-I2pJavaConfigValue -Path $tunnels `
@@ -219,9 +290,56 @@ function script:Set-I2pJavaProxyOverrides {
     return $true
 }
 
+# Validate and stage the related files before replacing any effective file.
+function script:Set-I2pJavaProxyOverrides {
+    if (-not (Assert-RouterProxySettings)) { return $false }
+    if (-not ($script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE -or
+            $script:ROUTER_SOCKS_PROXY_HOST_OVERRIDE -or $script:ROUTER_SOCKS_PROXY_PORT_OVERRIDE)) { return $true }
+    $stage = Join-Path $script:BACKEND_DATA_DIR ('.proxy-config-' + [guid]::NewGuid().ToString('N'))
+    $new = Join-Path $stage 'new'
+    $old = Join-Path $stage 'old'
+    $files = @('i2ptunnel.config', 'addressbook/config.txt', 'router.config')
+    $published = @()
+    $keepRecovery = $false
+    try {
+        foreach ($directory in @($new, $old)) {
+            New-Item -ItemType Directory -Path (Join-Path $directory 'addressbook') -Force | Out-Null
+        }
+        foreach ($file in ($files + @('clients.config'))) {
+            Copy-Item -LiteralPath (Join-Path $script:BACKEND_DATA_DIR $file) -Destination (Join-Path $new $file)
+        }
+        if (-not (Set-I2pJavaStagedProxyOverrides $new) -or -not (Test-I2pJavaConfigDirectory $new)) { return $false }
+        foreach ($file in $files) {
+            [IO.File]::Replace((Join-Path $new $file), (Join-Path $script:BACKEND_DATA_DIR $file), (Join-Path $old $file))
+            $published += $file
+        }
+        return $true
+    }
+    catch {
+        foreach ($file in $published) {
+            try {
+                [IO.File]::Replace((Join-Path $old $file), (Join-Path $script:BACKEND_DATA_DIR $file), $null)
+            }
+            catch {
+                Write-RouterError (Get-I18nMessage 'error.effective-config' @($old))
+                # Keep the recovery copies when restoration fails.
+                $keepRecovery = $true
+                return $false
+            }
+        }
+        return $false
+    }
+    finally {
+        if (-not $keepRecovery) {
+            Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # Seed only missing files: this is both the initial configuration copy and
 # the preservation boundary for existing effective settings and router state.
 function script:Initialize-BackendConfig {
+    if (-not (Assert-RouterProxySettings)) { return $false }
     $src = $script:BACKEND_CONFIG_DIR
     $dst = $script:BACKEND_DATA_DIR
 

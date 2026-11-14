@@ -65,6 +65,7 @@ checks are the available validation:
 ```sh
 bash tests/test-i18n.bash
 bash tests/test-proxy-policy.bash
+bash tests/test-router-safety.bash
 pwsh -NoProfile -File tests/test-i18n.ps1   # when pwsh is available
 bash -n install.bash build/build.bash build/scripts/*.bash \
   lib/*.bash lib/backends/*.bash tests/*.bash i2pd/*.bash \
@@ -103,6 +104,9 @@ user state, not source.
   signature-verified; vendored I2P (Java) requires `I2P_INSTALLER_SHA512`,
   supplied from an independently trusted source before executing its installer.
   Do not describe any of these as stronger than they are.
+- Validate endpoints before any effective configuration write and validate
+  saved listeners before startup. A safe environment does not validate an
+  existing configuration. Preserve the staged Java config update and rollback.
 - Never add automatic Defender exclusions or bypass Java installer verification.
   Its console installer requires an interactive terminal and is incompatible
   with provisioning under `--non-interactive`.

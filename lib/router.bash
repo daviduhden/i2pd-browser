@@ -547,8 +547,17 @@ router_is_misconfigured() {
 	backend_is_misconfigured
 }
 
+router_require_proxy_settings() {
+	if ! router_validate_proxy_settings; then
+		router_error "$(router_t error.proxy-settings)"
+		return 1
+	fi
+}
+
 router_prepare_config() {
-	backend_prepare_config
+	router_require_proxy_settings || return 1
+	backend_prepare_config || return 1
+	backend_validate_config
 }
 
 router_dependency_hint() {
@@ -581,11 +590,9 @@ router_state() {
 # Do not take ownership of an already-running system router. Backends decide
 # whether their instance is running and whether this project started it.
 router_start() {
-	if ! router_validate_proxy_settings; then
-		router_error "Proxy overrides must use 127.0.0.1 and ports from 1 to 65535."
-		return 1
-	fi
+	router_require_proxy_settings || return 1
 	if backend_is_running; then
+		backend_validate_config || return 1
 		if backend_is_managed; then
 			router_log "The I2P router is already running (managed by I2Pd Browser)."
 		else
@@ -610,6 +617,7 @@ router_start() {
 		return 1
 	fi
 
+	router_prepare_config || return 1
 	backend_start
 }
 
