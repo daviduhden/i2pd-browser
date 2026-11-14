@@ -504,6 +504,8 @@ cmd_detect() {
 
 main() {
 	parse_args "$@"
+	# shellcheck disable=SC2034 # Consumed by the selected backend.
+	ROUTER_NON_INTERACTIVE="$non_interactive"
 	if ((show_help == 1)); then
 		# Show help in the requested language when it is valid, but
 		# never reject --help because of a bad --language value.

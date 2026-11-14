@@ -273,6 +273,16 @@ function script:Get-I2pJavaInstallerUrl {
 }
 
 function script:Install-BackendVendor {
+    $expected = $env:I2P_INSTALLER_SHA512
+    if (-not $expected -or $expected -notmatch '^[0-9a-fA-F]{128}$') {
+        Write-RouterError (Get-I18nMessage 'error.java-checksum')
+        return $false
+    }
+    $nonInteractive = Get-Variable -Name ROUTER_NON_INTERACTIVE -Scope Script -ErrorAction SilentlyContinue
+    if (($nonInteractive -and $nonInteractive.Value) -or -not (Test-RouterInteractive)) {
+        Write-RouterError (Get-I18nMessage 'error.java-interactive')
+        return $false
+    }
     $version = Get-I2pJavaLatestVersion
     if (-not $version) {
         Write-RouterError 'Could not determine the latest I2P release.'
@@ -296,13 +306,11 @@ function script:Install-BackendVendor {
         return $false
     }
 
-    # The upstream project does not publish a checksum at this URL.
-    # At minimum, reject an HTML error page masquerading as a JAR.
-    # This is not authenticity or signature verification.
-    $bytes = [IO.File]::ReadAllBytes($installer)
-    if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4B) {
-        Remove-Item -Force $installer
-        Write-RouterError 'Downloaded I2P installer is not a valid JAR.'
+    # Obtain the expected digest independently from a trusted release source.
+    $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA512).Hash
+    if ($actual -ne $expected) {
+        Remove-Item -LiteralPath $installer -Force
+        Write-RouterError (Get-I18nMessage 'error.java-checksum')
         return $false
     }
 

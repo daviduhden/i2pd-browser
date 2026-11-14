@@ -177,7 +177,7 @@ i2p_java_installer_url() {
 		true)"
 	# Require HTTPS here; a plaintext installer URL must never be used.
 	href="$(printf '%s\n' "$html" |
-		grep -oE "https://[^\"']*i2pinstall_${version//./\\.}\.jar" |
+		grep -oE "https://(files\.i2p\.net|i2p\.net)/[^\"']*i2pinstall_${version//./\\.}\.jar" |
 		head -n 1)"
 	if [[ -z $href ]]; then
 		href="https://files.i2p.net/${version}"
@@ -189,7 +189,16 @@ i2p_java_installer_url() {
 # Download the official I2P installer and run it into the managed
 # vendor directory. The IzPack console installer is interactive.
 backend_vendor_install() {
-	local version url dir home installer java
+	local version url dir home installer java expected actual
+	expected="${I2P_INSTALLER_SHA512:-}"
+	if [[ ! $expected =~ ^[[:xdigit:]]{128}$ ]]; then
+		router_error "$(router_t error.java-checksum)"
+		return 1
+	fi
+	if [[ ${ROUTER_NON_INTERACTIVE:-0} == 1 || ! -t 0 ]]; then
+		router_error "$(router_t error.java-interactive)"
+		return 1
+	fi
 
 	version="$(i2p_java_latest_version)" || {
 		router_error "Could not determine the latest I2P release."
@@ -214,13 +223,11 @@ backend_vendor_install() {
 		router_error "Could not download $url"
 		return 1
 	fi
-	# The upstream project does not publish a checksum at this URL.
-	# At minimum, reject an HTML error page masquerading as a JAR.
-	# This is not authenticity or signature verification.
-	if [[ ! -s $installer ]] ||
-		[[ $(head -c 2 "$installer") != "PK" ]]; then
+	# The digest must be obtained independently from a trusted release source.
+	actual="$(router_sha512sum "$installer")" || return 1
+	if [[ ${actual,,} != "${expected,,}" ]]; then
 		rm -f "$installer"
-		router_error "Downloaded I2P installer is not a valid JAR."
+		router_error "$(router_t error.java-checksum)"
 		return 1
 	fi
 

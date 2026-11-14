@@ -440,6 +440,7 @@ function Invoke-DetectCommand {
 }
 
 Import-Args -Arguments $args
+$script:ROUTER_NON_INTERACTIVE = $script:NonInteractive
 if ($script:ShowHelp) {
     # Show help in the requested language when it is valid, but never
     # reject --help because of a bad --language value.

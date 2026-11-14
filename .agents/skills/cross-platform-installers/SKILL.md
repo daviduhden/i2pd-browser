@@ -117,9 +117,9 @@ inspection.
 
 - **PowerShell argument forwarding.** Functions read `$args` from their
   own scope. Call `Main @args`; a bare `Main` drops script arguments.
-- **Non-interactive detection.** Bash checks `-t 0`; PowerShell uses
-  .NET `UserInteractive`. Redirected stdin is not equivalent on both
-  platforms.
+- **Non-interactive detection.** Bash checks `-t 0`; PowerShell requires
+  .NET `UserInteractive` and non-redirected stdin. Java vendor provisioning
+  requires an interactive terminal even when selection itself is explicit.
 - **Case sensitivity.** Bash matches options case-sensitively;
   PowerShell's `switch -Regex` is case-insensitive by default.
 - **Atomic config writes.** `WriteAllLines` alone truncates in place.
@@ -129,8 +129,8 @@ inspection.
 - **`winget` chains.** Capture each command's exit code; returning only
   the last one can hide a failed Java installation.
 - **Vendored I2P (Java).** The official installer is interactive and
-  unverified; do not turn it into an unattended path without adding
-  integrity verification.
+  requires an independently trusted `I2P_INSTALLER_SHA512` before execution.
+  Reject provisioning under `--non-interactive`; do not fake unattended support.
 - **Line endings.** A CRLF `.properties` value can carry `\r` into a
   message. Keep the LF attributes and the loader's defensive strip.
 

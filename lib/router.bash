@@ -292,7 +292,7 @@ router_download() {
 	local dest="$2"
 
 	if router_have curl; then
-		curl -fL --retry 3 --retry-delay 2 -o "$dest" "$url"
+		curl --proto =https --proto-redir =https -fL --retry 3 --retry-delay 2 -o "$dest" "$url"
 	elif router_have wget; then
 		wget -O "$dest" "$url"
 	else
@@ -392,7 +392,7 @@ router_extract_deb() {
 
 	if router_have dpkg-deb; then
 		dpkg-deb -x "$archive" "$dest"
-		return 0
+		return $?
 	fi
 	if router_have ar && router_have tar; then
 		tmp="$(mktemp -d)" || return 1
@@ -406,9 +406,10 @@ router_extract_deb() {
 			router_error "No data.tar found in $archive"
 			return 1
 		fi
-		tar -xf "$data" -C "$dest"
+		local status=0
+		tar -xf "$data" -C "$dest" || status=$?
 		rm -rf "$tmp"
-		return 0
+		return "$status"
 	fi
 	router_error "'dpkg-deb' or 'ar'/'tar' is required for $archive"
 	return 1

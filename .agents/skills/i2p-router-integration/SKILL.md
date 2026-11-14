@@ -45,8 +45,9 @@ commands. Use `firefox-esr-bundling` for Firefox-specific work.
 - Vendored i2pd downloads the latest GitHub release and verifies the
   release asset against the release `SHA512SUMS` before extraction.
   Vendored I2P (Java) downloads the official installer over HTTPS,
-  runs its interactive console installer, and has no checksum or
-  signature verification. Do not claim otherwise.
+  runs its interactive console installer only after matching the independently
+  supplied `I2P_INSTALLER_SHA512`. It does not automatically verify a PGP
+  signature. Provisioning is rejected with redirected input or --non-interactive.
 
 ## PowerShell backend scope
 
@@ -71,8 +72,9 @@ does not verify that its lifecycle API remains available after import.
 5. Keep the effective configuration isolated per backend. Do not point
    either router at a user's global configuration directory.
 6. For vendored i2pd, keep the SHA-512 fetch, exact asset-name match,
-   failure cleanup, and `VERSION` write. For vendored I2P (Java), keep
-   HTTPS and state the missing integrity check in review notes.
+   failure cleanup, and `VERSION` write. For vendored I2P (Java), require
+   the independently trusted digest before download/execution, retain HTTPS and
+   existing official origins, and distinguish checksum verification from PGP trust.
 7. Keep endpoint overrides loopback-only (`127.0.0.1`) and validate ports
    in the 1-65535 range. The installers pass the selected HTTP endpoint to
    the builders, which rewrite generated HTTP and SSL policy values; preserve
@@ -125,8 +127,8 @@ delete its PID file, or remove its data directory.
   proves a healthy router.
 - **Missing `screen` on Linux.** Start fails without it. Keep the
   dependency hint accurate.
-- **Vendored I2P (Java) installer.** It is interactive and unverified.
-  Automation must not pretend it is unattended.
+- **Vendored I2P (Java) installer.** It is interactive and requires a trusted
+  supplied checksum. Automation must not pretend it is unattended or signed.
 - **Port drift.** The router configs, shared defaults, Firefox policy,
   and documentation are separate sources of truth. Update all of them.
 - **Configuration write failures.** Bash writes the config through a

@@ -100,8 +100,12 @@ user state, not source.
   download origins. Existing build/install downloads must stay HTTPS
   and integrity-checked where the code supports it. Firefox and i2pd
   use SHA-512 checks; NoScript is structurally checked but not
-  signature-verified; vendored I2P (Java) has no checksum verification.
+  signature-verified; vendored I2P (Java) requires `I2P_INSTALLER_SHA512`,
+  supplied from an independently trusted source before executing its installer.
   Do not describe any of these as stronger than they are.
+- Never add automatic Defender exclusions or bypass Java installer verification.
+  Its console installer requires an interactive terminal and is incompatible
+  with provisioning under `--non-interactive`.
 - Never stop a router that was not started by I2Pd Browser. Use the
   system service or the router's own tooling instead.
 - Never commit keys, `netDb/`, peer profiles, logs, `i2p-java/data/`,
