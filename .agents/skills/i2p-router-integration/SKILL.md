@@ -36,9 +36,11 @@ commands. Use `firefox-esr-bundling` for Firefox-specific work.
   does not automatically receive later vendored edits. The launcher
   passes absolute `-Di2p.dir.base` and `-Di2p.dir.config`; the global
   `~/.i2p` must remain untouched.
-- Linux start uses detached `screen` sessions named `i2pd` and
-  `i2p-java`. Managed detection is the matching screen session.
-  Windows uses hidden processes and `<backend>/.router.pid`.
+- Linux screen session names are unique to the installation root. Managed
+  detection verifies the exact saved screen PID, creation time and installation
+  directory. Windows stores a JSON identity in `<backend>/.router.pid` and
+  verifies process creation time, executable and installation-specific arguments.
+  Old PID-only or name-only records do not establish ownership.
 - `stop` and `restart` refuse to stop a running router unless it is
   detected as managed. This is a safety invariant, not an obstacle to
   work around.
@@ -117,11 +119,12 @@ delete its PID file, or remove its data directory.
 - **Stale I2P (Java) config.** `i2p-java/data/` is seeded once. Editing
   `i2p-java/config/` does not update an existing effective file. Test a
   config change with a disposable `data/` directory.
-- **Wrong managed detection.** A same-name screen session or a reused
-  PID can look managed. Do not widen the check; narrow changes only
-  with evidence.
-- **Windows force stop.** The PowerShell backend uses
-  `Stop-Process -Force`; preserve the managed check before it.
+- **Wrong managed detection.** A reused PID or same-name session must fail
+  identity verification. Do not bypass missing executable/creation metadata.
+  Explain manual recovery for old records instead of adopting the process.
+- **Windows force stop.** The PowerShell backend verifies the full saved
+  identity and calls `Kill()` on the verified process object. Preserve the
+  identity check and exit wait; never resolve a saved PID again to terminate it.
 - **i2pd misconfigured state.** On Windows it is always reported as not
   misconfigured, even if optional steps fail. Do not assume that state
   proves a healthy router.

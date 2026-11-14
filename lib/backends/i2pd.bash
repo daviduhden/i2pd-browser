@@ -231,9 +231,7 @@ backend_is_running() {
 
 # True only for the instance started by this project.
 backend_is_managed() {
-	command -v screen >/dev/null 2>&1 || return 1
-	screen -ls 2>/dev/null |
-		grep -q "[0-9]\.${BACKEND_SCREEN_SESSION}[[:space:]]"
+	router_screen_is_managed
 }
 
 backend_console_url() {
@@ -334,7 +332,7 @@ backend_start() {
 	# i2pd reads i2pd.conf and tunnels.conf from its data directory.
 	(
 		cd "$BACKEND_DIR" || exit 1
-		screen -Adm -S "$BACKEND_SCREEN_SESSION" \
+		router_start_screen \
 			"$i2pd_path" "${i2pd_args[@]}"
 	)
 }
@@ -345,5 +343,5 @@ backend_stop() {
 		return 1
 	}
 	router_log "Stopping the managed i2pd screen session."
-	screen -S "$BACKEND_SCREEN_SESSION" -X quit
+	router_stop_screen
 }

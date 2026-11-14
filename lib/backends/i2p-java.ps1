@@ -95,14 +95,8 @@ function script:Get-BackendIsMisconfigured {
 }
 
 function script:Get-I2pJavaProcess {
-    $pidFile = $script:BACKEND_PID_FILE
-    if (Test-Path $pidFile) {
-        $pidValue = (Get-Content $pidFile -Raw).Trim()
-        if ($pidValue) {
-            $process = Get-Process -Id ([int]$pidValue) -ErrorAction SilentlyContinue
-            if ($process) { return $process }
-        }
-    }
+    $managed = Get-RouterManagedProcess
+    if ($managed) { return $managed }
     try {
         $processes = Get-CimInstance Win32_Process -Filter "Name='java.exe'"
         foreach ($process in $processes) {
@@ -122,10 +116,11 @@ function script:Get-BackendIsRunning {
 }
 
 function script:Get-BackendIsManaged {
-    if (-not (Test-Path $script:BACKEND_PID_FILE)) { return $false }
-    $pidValue = (Get-Content $script:BACKEND_PID_FILE -Raw).Trim()
-    if (-not $pidValue) { return $false }
-    return [bool](Get-Process -Id ([int]$pidValue) -ErrorAction SilentlyContinue)
+    return [bool](Get-RouterManagedProcess)
+}
+
+function script:Get-BackendExecutable {
+    return (Get-I2pJavaExecutable)
 }
 
 function script:Get-BackendConsoleUrl {
@@ -499,21 +494,15 @@ function script:Start-Backend {
     )
     $process = Start-Process -FilePath $java -ArgumentList $arguments `
         -WorkingDirectory $script:BACKEND_DIR -WindowStyle Hidden -PassThru
-    Set-Content -Path $script:BACKEND_PID_FILE -Value $process.Id `
-        -Encoding ascii
+    if (-not (Save-RouterProcessIdentity $process)) {
+        # This handle was created by this invocation; never leave it orphaned.
+        if (-not $process.HasExited) { $process.Kill(); $process.WaitForExit(30000) | Out-Null }
+        Write-RouterError (Get-I18nMessage 'error.router-identity')
+        return $false
+    }
     return $true
 }
 
 function script:Stop-Backend {
-    if (-not (Test-Path $script:BACKEND_PID_FILE)) {
-        Write-RouterWarn 'No managed I2P (Java) PID file was found.'
-        return $false
-    }
-    $pidValue = (Get-Content $script:BACKEND_PID_FILE -Raw).Trim()
-    Write-RouterLog 'Stopping the managed I2P (Java) process.'
-    if ($pidValue) {
-        Stop-Process -Id ([int]$pidValue) -Force -ErrorAction SilentlyContinue
-    }
-    Remove-Item -Force $script:BACKEND_PID_FILE -ErrorAction SilentlyContinue
-    return $true
+    return (Stop-RouterManagedProcess)
 }

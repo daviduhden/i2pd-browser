@@ -666,6 +666,73 @@ router_wait_for_proxy() {
 	done
 }
 
+# An instance belongs to this installation only when its exact screen PID,
+# kernel creation time and local working directory match the saved identity.
+# Old name-only sessions are intentionally treated as unmanaged.
+router_screen_session() {
+	local digest
+	digest="$(printf '%s' "$I2PD_BROWSER_ROOT" | sha512sum)" || return 1
+	printf 'i2pd-browser-%s-%s\n' "$BACKEND_NAME" "${digest:0:20}"
+}
+
+router_screen_is_managed() {
+	local pid started session extra current actual_session
+	[[ -r $BACKEND_DIR/.router.pid ]] || return 1
+	read -r pid started session extra <"$BACKEND_DIR/.router.pid" || return 1
+	[[ $pid =~ ^[0-9]+$ && $started =~ ^[0-9]+$ && -z $extra ]] || return 1
+	[[ $session == "$(router_screen_session)"-* ]] || return 1
+	[[ -r /proc/$pid/stat && $(readlink "/proc/$pid/cwd") == "$BACKEND_DIR" ]] || return 1
+	[[ $(readlink "/proc/$pid/exe") == "$(readlink -f "$(command -v screen)")" ]] || return 1
+	current="$(awk '{print $22}' "/proc/$pid/stat")" || return 1
+	[[ $current == "$started" ]] || return 1
+	actual_session="$(screen -ls 2>/dev/null | awk -v id="$pid.$session" '$1 == id { print $1 }')" || return 1
+	[[ $actual_session == "$pid.$session" ]]
+}
+
+router_start_screen() {
+	local session identity pid started
+	command -v sha512sum >/dev/null 2>&1 || return 1
+	session="$(router_screen_session)-$$-$RANDOM" || return 1
+	# The per-launch suffix makes cleanup refer only to the session created here.
+	screen -Adm -S "$session" "$@" || return 1
+	if ! identity="$(screen -ls 2>/dev/null | awk -v name="$session" '$1 ~ /^[0-9]+\./ { id=$1; sub(/^[0-9]+\./, "", $1); if ($1 == name) print id }')"; then
+		screen -S "$session" -X quit || true
+		return 1
+	fi
+	pid="${identity%%.*}"
+	if [[ ! $pid =~ ^[0-9]+$ || ! -r /proc/$pid/stat ]] ||
+		! started="$(awk '{print $22}' "/proc/$pid/stat")"; then
+		screen -S "$session" -X quit || true
+		return 1
+	fi
+	if ! (
+		umask 077
+		printf '%s %s %s\n' "$pid" "$started" "$session" >"$BACKEND_DIR/.router.pid.tmp.$$" &&
+			mv "$BACKEND_DIR/.router.pid.tmp.$$" "$BACKEND_DIR/.router.pid"
+	) || ! router_screen_is_managed; then
+		screen -S "$identity" -X quit || true
+		rm -f "$BACKEND_DIR/.router.pid.tmp.$$"
+		return 1
+	fi
+}
+
+router_stop_screen() {
+	local pid started session extra
+	if ! router_screen_is_managed; then
+		router_error "$(router_t error.router-identity)"
+		return 1
+	fi
+	read -r pid started session extra <"$BACKEND_DIR/.router.pid" || return 1
+	screen -S "$pid.$session" -X quit || return 1
+	# Wait for this exact instance to exit before a restart can bind its ports.
+	local deadline=$((SECONDS + 30))
+	while [[ -r /proc/$pid/stat ]] && [[ $(awk '{print $22}' "/proc/$pid/stat") == "$started" ]]; do
+		((SECONDS < deadline)) || return 1
+		sleep 1
+	done
+	rm -f "$BACKEND_DIR/.router.pid"
+}
+
 # ------------------------------------------------------------------
 # Dependency installation helpers
 # ------------------------------------------------------------------

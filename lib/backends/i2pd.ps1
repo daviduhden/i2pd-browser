@@ -63,21 +63,16 @@ function script:Get-BackendIsInstalled {
 function script:Get-BackendIsMisconfigured { return $false }
 
 function script:Get-BackendIsRunning {
-    if (Test-Path $script:BACKEND_PID_FILE) {
-        $pidValue = (Get-Content $script:BACKEND_PID_FILE -Raw).Trim()
-        if ($pidValue) {
-            $process = Get-Process -Id ([int]$pidValue) -ErrorAction SilentlyContinue
-            if ($process) { return $true }
-        }
-    }
+    if (Get-RouterManagedProcess) { return $true }
     return [bool](Get-Process -Name 'i2pd' -ErrorAction SilentlyContinue)
 }
 
 function script:Get-BackendIsManaged {
-    if (-not (Test-Path $script:BACKEND_PID_FILE)) { return $false }
-    $pidValue = (Get-Content $script:BACKEND_PID_FILE -Raw).Trim()
-    if (-not $pidValue) { return $false }
-    return [bool](Get-Process -Id ([int]$pidValue) -ErrorAction SilentlyContinue)
+    return [bool](Get-RouterManagedProcess)
+}
+
+function script:Get-BackendExecutable {
+    return (Get-I2pdPath)
 }
 
 function script:Get-BackendConsoleUrl {
@@ -245,7 +240,7 @@ function script:Start-Backend {
     }
 
     Write-RouterLog "Starting i2pd with binary: $binary"
-    $arguments = @('--datadir=.')
+    $arguments = @(('--datadir="' + $script:BACKEND_DIR + '"'))
     if ($script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or
         $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE) {
         $arguments += "--httpproxy.address=$(Get-RouterHttpProxyHost)"
@@ -260,21 +255,15 @@ function script:Start-Backend {
         -ArgumentList $arguments `
         -WorkingDirectory $script:BACKEND_DIR `
         -WindowStyle Hidden -PassThru
-    Set-Content -Path $script:BACKEND_PID_FILE -Value $process.Id `
-        -Encoding ascii
+    if (-not (Save-RouterProcessIdentity $process)) {
+        # This handle was created by this invocation; never leave it orphaned.
+        if (-not $process.HasExited) { $process.Kill(); $process.WaitForExit(30000) | Out-Null }
+        Write-RouterError (Get-I18nMessage 'error.router-identity')
+        return $false
+    }
     return $true
 }
 
 function script:Stop-Backend {
-    if (-not (Test-Path $script:BACKEND_PID_FILE)) {
-        Write-RouterWarn 'No managed i2pd PID file was found.'
-        return $false
-    }
-    $pidValue = (Get-Content $script:BACKEND_PID_FILE -Raw).Trim()
-    Write-RouterLog 'Stopping the managed i2pd process.'
-    if ($pidValue) {
-        Stop-Process -Id ([int]$pidValue) -Force -ErrorAction SilentlyContinue
-    }
-    Remove-Item -Force $script:BACKEND_PID_FILE -ErrorAction SilentlyContinue
-    return $true
+    return (Stop-RouterManagedProcess)
 }

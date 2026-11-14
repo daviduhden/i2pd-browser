@@ -314,9 +314,7 @@ backend_is_running() {
 }
 
 backend_is_managed() {
-	command -v screen >/dev/null 2>&1 || return 1
-	screen -ls 2>/dev/null |
-		grep -q "[0-9]\.${BACKEND_SCREEN_SESSION}[[:space:]]"
+	router_screen_is_managed
 }
 
 backend_console_url() {
@@ -569,7 +567,7 @@ backend_start() {
 	(
 		umask 077
 		cd "$BACKEND_DIR" || exit 1
-		screen -Adm -S "$BACKEND_SCREEN_SESSION" \
+		router_start_screen \
 			"$java" \
 			-Djava.awt.headless=true \
 			-Di2p.dir.base="$home" \
@@ -588,5 +586,5 @@ backend_stop() {
 		return 1
 	}
 	router_log "Stopping the managed I2P (Java) screen session."
-	screen -S "$BACKEND_SCREEN_SESSION" -X quit
+	router_stop_screen
 }

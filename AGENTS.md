@@ -111,7 +111,8 @@ user state, not source.
   Its console installer requires an interactive terminal and is incompatible
   with provisioning under `--non-interactive`.
 - Never stop a router that was not started by I2Pd Browser. Use the
-  system service or the router's own tooling instead.
+  system service or the router's own tooling instead. Verify creation time,
+  executable and installation identity; a PID or screen name alone is insufficient.
 - Never commit keys, `netDb/`, peer profiles, logs, `i2p-java/data/`,
   `vendor/`, `browser/`, or `i2pd-browser.conf`.
 - Preserve copyrights and licenses. The project is BSD-3-Clause; the

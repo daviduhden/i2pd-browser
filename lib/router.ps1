@@ -595,6 +595,67 @@ function Restart-Router {
 
 # Wait until the HTTP proxy accepts TCP connections. This only checks
 # local reachability, never performs any network request.
+# Numeric legacy PID files do not establish ownership and are never adopted.
+# Compare creation time, executable, full command line and installation root
+# immediately before terminating a process to prevent PID reuse accidents.
+function Get-RouterManagedProcess {
+    try {
+        $identity = Get-Content -LiteralPath $script:BACKEND_PID_FILE -Raw | ConvertFrom-Json
+        if ($identity.Root -ne $script:BACKEND_DIR -or
+            $identity.Executable -ne (Get-BackendExecutable)) { return $null }
+        $process = Get-Process -Id ([int]$identity.ProcessId) -ErrorAction Stop
+        $native = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)" -ErrorAction Stop
+        if ($process.StartTime.ToUniversalTime().Ticks.ToString() -ne $identity.StartTicks -or
+            $process.Path -ne $identity.Executable -or
+            $native.CommandLine -cne $identity.CommandLine -or
+            -not $native.CommandLine.Contains($script:BACKEND_DIR)) { return $null }
+        return $process
+    }
+    catch { return $null }
+}
+
+function Save-RouterProcessIdentity {
+    param([Diagnostics.Process]$Process)
+    $temporary = "$script:BACKEND_PID_FILE.tmp.$PID"
+    try {
+        $Process.Refresh()
+        if ($Process.HasExited) { return $false }
+        $native = Get-CimInstance Win32_Process -Filter "ProcessId=$($Process.Id)" -ErrorAction Stop
+        if (-not $native.CommandLine.Contains($script:BACKEND_DIR)) { return $false }
+        $identity = @{
+            ProcessId = $Process.Id
+            StartTicks = $Process.StartTime.ToUniversalTime().Ticks.ToString()
+            Executable = $Process.Path
+            CommandLine = $native.CommandLine
+            Root = $script:BACKEND_DIR
+        }
+        [IO.File]::WriteAllText($temporary, ($identity | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+        if (Test-Path -LiteralPath $script:BACKEND_PID_FILE) {
+            [IO.File]::Replace($temporary, $script:BACKEND_PID_FILE, $null)
+        }
+        else { [IO.File]::Move($temporary, $script:BACKEND_PID_FILE) }
+        return [bool](Get-RouterManagedProcess)
+    }
+    catch { return $false }
+    finally { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
+}
+
+function Stop-RouterManagedProcess {
+    $process = Get-RouterManagedProcess
+    if (-not $process) {
+        Write-RouterError (Get-I18nMessage 'error.router-identity')
+        return $false
+    }
+    try {
+        # Kill the verified process object, rather than resolving a PID again.
+        $process.Kill()
+        if (-not $process.WaitForExit(30000)) { return $false }
+        Remove-Item -LiteralPath $script:BACKEND_PID_FILE -Force
+        return $true
+    }
+    catch { return $false }
+}
+
 function Test-RouterPort {
     param(
         [string]$HostName,
