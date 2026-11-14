@@ -368,73 +368,169 @@ cmd_install() {
 	print_summary
 }
 
+configure_start_router() {
+	((no_start == 0)) || return 0
+	if ! router_start || ! router_wait_for_proxy "$PROXY_TIMEOUT" ||
+		{ ((allow_external == 0)) && ! router_is_managed; }; then
+		router_error "$(router_t error.effective-config "$(router_http_proxy)")"
+		return 1
+	fi
+}
+
+restore_browser_after_configure() {
+	local backup="$I2PD_BROWSER_ROOT/.browser-old" browser="$I2PD_BROWSER_ROOT/browser"
+	[[ -d $backup && ! -L $backup ]] || return 0
+	if [[ -e $browser/data/lock || -L $browser/data/lock ||
+		-e $browser/data/.parentlock || -L $browser/data/.parentlock ||
+		-e $browser/data/parent.lock || -L $browser/data/parent.lock ||
+		-e $I2PD_BROWSER_ROOT/.browser-switch-failed || -L $I2PD_BROWSER_ROOT/.browser-switch-failed ]]; then
+		router_error "$(router_t error.effective-config "$backup")"
+		return 1
+	fi
+	if [[ -e $browser ]]; then
+		mv "$browser" "$I2PD_BROWSER_ROOT/.browser-switch-failed" || return 1
+	fi
+	mv "$backup" "$browser"
+}
+
 cmd_configure() {
-	local backend="$option_router" selected_language
-	local source="$option_source"
-	local current current_source current_pretty
+	local lock="$I2PD_BROWSER_ROOT/.browser-switch.lock" status=0
+	if ! mkdir "$lock"; then
+		router_error "$(router_t error.effective-config "$lock")"
+		return 1
+	fi
+	# Only remove this invocation's empty lock directory; never delete user data.
+	trap 'rmdir "$I2PD_BROWSER_ROOT/.browser-switch.lock" 2>/dev/null || true' EXIT
+	if [[ -e $I2PD_BROWSER_ROOT/.browser-build.lock || -L $I2PD_BROWSER_ROOT/.browser-build.lock ]]; then
+		router_error "$(router_t error.effective-config "$I2PD_BROWSER_ROOT/.browser-build.lock")"
+		status=1
+	else
+		configure_transaction || status=$?
+	fi
+	rmdir "$lock" || return 1
+	trap - EXIT
+	return "$status"
+}
 
+configure_transaction() {
+	local backend source selected_language current current_source old_language
+	local was_running=0 must_stop=0 stopped=0 allow_external=0 snapshot="" old_http_port=4444 old_socks_port=4447
+	if [[ -e $I2PD_BROWSER_ROOT/.browser-old || -L $I2PD_BROWSER_ROOT/.browser-old ||
+		-e $I2PD_BROWSER_ROOT/.browser-switch-failed || -L $I2PD_BROWSER_ROOT/.browser-switch-failed ]]; then
+		router_error "$(router_t error.effective-config "$I2PD_BROWSER_ROOT/.browser-old")"
+		return 1
+	fi
 	current="$(router_conf_get)"
+	[[ -n $current ]] || current="$I2P_ROUTER_DEFAULT"
 	current_source="$(router_conf_get_source)"
+	[[ -n $current_source ]] || current_source="$I2P_ROUTER_SOURCE_DEFAULT"
+	old_language="$(i18n_stored_locale)"
+	[[ -n $old_language ]] || old_language="$I2PD_BROWSER_LANGUAGE"
+	backend="${option_router:-${current:-$I2P_ROUTER_DEFAULT}}"
+	source="${option_source:-$current_source}"
+	router_require_valid_backend "$backend" || return 1
+	router_require_valid_source "$source" || return 1
+	selected_language="$(i18n_select_locale "$option_language")" || return 2
 
-	if [[ -z $backend && -n $current ]]; then
-		backend="$current"
-	fi
-	if [[ -z $backend ]]; then
-		backend="$I2P_ROUTER_DEFAULT"
-	fi
-	router_require_valid_backend "$backend" || exit 1
-
-	if [[ -z $source && -n $current_source ]]; then
-		source="$current_source"
-	fi
-	if [[ -z $source ]]; then
-		source="$I2P_ROUTER_SOURCE_DEFAULT"
-	fi
-	router_require_valid_source "$source" || exit 1
-
-	# Validate and prepare the new backend before stopping the old one.
-	# A missing dependency must not leave the user without a router or
-	# persist a selection that cannot work.
-	ROUTER_SOURCE="$source"
-	router_load_backend "$backend" || exit 1
-	ensure_backend_available || exit 1
-	router_prepare_config || exit 1
-
-	if [[ -n $current ]] && router_is_valid_backend "$current" &&
-		{ [[ $current != "$backend" ]] || [[ $current_source != "$source" ]]; }; then
-		current_pretty="$(router_backend_pretty "$current")"
-		router_log "Switching from $current_pretty ($current_source)" \
-			"to $(router_backend_pretty "$backend") ($source)."
-		if router_load_backend "$current"; then
-			ROUTER_SOURCE="$current_source"
-			if router_is_running; then
-				if router_is_managed; then
-					router_stop || exit 1
-				else
-					router_warn "$(router_backend_pretty "$current")" \
-						"is running but is not managed; leaving it" \
-						"running."
+	# Inspect ownership before changing effective files or stopping anything.
+	if [[ -n $current ]] && router_is_valid_backend "$current"; then
+		ROUTER_SOURCE="$current_source"
+		router_load_backend "$current" || return 1
+		if router_is_running; then
+			was_running=1
+			old_http_port="$(backend_config_proxy_port httpproxy)" || return 1
+			old_socks_port="$(backend_config_proxy_port socksproxy)" || return 1
+			if [[ $current != "$backend" || $current_source != "$source" ||
+				-n $ROUTER_HTTP_PROXY_OVERRIDE || -n $ROUTER_SOCKS_PROXY_OVERRIDE ]]; then
+				if ! router_is_managed; then
+					router_error "$(router_t error.router-conflict)"
+					return 1
 				fi
+				must_stop=1
 			fi
 		fi
 	fi
-
-	selected_language="$(i18n_select_locale "$option_language")" || {
-		router_error "$(router_t language.invalid "$option_language")"
-		exit 2
-	}
-	i18n_init "$selected_language"
-	router_conf_set "$backend" "$source" "$selected_language" || exit 1
 	ROUTER_SOURCE="$source"
-	router_load_backend "$backend" || exit 1
-	router_log "$(router_t status.selected-router "$ROUTER_BACKEND_PRETTY" "$source")"
-
-	if ((no_browser == 0)); then
-		build_browser_if_needed || exit 1
+	router_load_backend "$backend" || return 1
+	router_require_proxy_settings || return 1
+	ensure_backend_available || return 1
+	if router_is_running && ! router_is_managed; then
+		if [[ $current == "$backend" && $current_source == "$source" &&
+			-z $ROUTER_HTTP_PROXY_OVERRIDE && -z $ROUTER_SOCKS_PROXY_OVERRIDE ]]; then
+			allow_external=1
+		else
+			router_error "$(router_t error.router-conflict)"
+			return 1
+		fi
 	fi
-	validate_browser_proxy || exit 1
-	wait_for_proxy_or_warn || exit 1
-	print_summary
+	i18n_init "$selected_language" || return 2
+	# Downloads and bundle validation finish while the old router still runs.
+	if ((no_browser == 0)); then
+		if ! I2PD_BROWSER_CONFIGURE_BUILD=1 I2PD_BROWSER_KEEP_BACKUP=1 build_browser_if_needed; then
+			restore_browser_after_configure || return 1
+			return 1
+		fi
+	fi
+	if ! validate_browser_proxy; then
+		restore_browser_after_configure || return 1
+		return 1
+	fi
+
+	if ((must_stop == 1)); then
+		ROUTER_SOURCE="$current_source"
+		if ! router_load_backend "$current" || ! router_stop; then
+			restore_browser_after_configure || return 1
+			return 1
+		fi
+		stopped=1
+	fi
+	ROUTER_SOURCE="$source"
+	if router_load_backend "$backend" && snapshot="$(router_snapshot_config)" &&
+		router_prepare_config && configure_start_router &&
+		router_conf_set "$backend" "$source" "$selected_language"; then
+		[[ -z $snapshot ]] || rm -rf "$snapshot"
+		[[ ! -d $I2PD_BROWSER_ROOT/.browser-old ]] || rm -rf "$I2PD_BROWSER_ROOT/.browser-old"
+		router_log "$(router_t status.selected-router "$ROUTER_BACKEND_PRETTY" "$source")"
+		print_summary
+		return 0
+	fi
+
+	# A failed start or persistence step must not silently replace the selection.
+	# Stop only the new managed instance that this change could have started.
+	if ((stopped == 1)) || ((was_running == 0)); then
+		if router_is_running && router_is_managed; then
+			if ! router_stop; then
+				router_error "$(router_t error.configure-rollback)"
+				return 1
+			fi
+		fi
+	fi
+	if ! restore_browser_after_configure || ! router_restore_config "$snapshot"; then
+		router_error "$(router_t error.configure-rollback)"
+		return 1
+	fi
+	if ((stopped == 1)); then
+		ROUTER_SOURCE="$current_source"
+		router_load_backend "$current" || return 1
+		i18n_init "$old_language" || return 1
+		# Overrides belong to the failed request, not to the old running router.
+		ROUTER_HTTP_PROXY_OVERRIDE=""
+		ROUTER_SOCKS_PROXY_OVERRIDE=""
+		# shellcheck disable=SC2034 # Consumed by lib/router.bash.
+		ROUTER_HTTP_PROXY_HOST=127.0.0.1
+		# shellcheck disable=SC2034 # Consumed by lib/router.bash.
+		ROUTER_SOCKS_PROXY_HOST=127.0.0.1
+		# shellcheck disable=SC2034 # Consumed by lib/router.bash.
+		ROUTER_HTTP_PROXY_PORT="$old_http_port"
+		# shellcheck disable=SC2034 # Consumed by lib/router.bash.
+		ROUTER_SOCKS_PROXY_PORT="$old_socks_port"
+		if ! router_start; then
+			router_error "$(router_t error.configure-rollback)"
+			return 1
+		fi
+	fi
+	router_warn "$(router_t info.configure-restored)"
+	return 1
 }
 
 load_backend_for_command() {

@@ -666,6 +666,35 @@ router_wait_for_proxy() {
 	done
 }
 
+# Save only files that proxy overrides may change; never copy router keys,
+# databases or the browser profile. Keep recovery copies on a restore error.
+router_snapshot_config() {
+	local snapshot file
+	[[ $BACKEND_NAME == i2p-java && -d $BACKEND_DATA_DIR ]] || return 0
+	snapshot="$(mktemp -d "$BACKEND_DATA_DIR/.configure-backup.XXXXXX")" || return 1
+	mkdir -p "$snapshot/addressbook" || return 1
+	for file in i2ptunnel.config addressbook/config.txt router.config; do
+		if [[ -f $BACKEND_DATA_DIR/$file ]]; then
+			cp -p "$BACKEND_DATA_DIR/$file" "$snapshot/$file" || return 1
+		fi
+	done
+	printf '%s\n' "$snapshot"
+}
+
+router_restore_config() {
+	local snapshot="$1" file
+	[[ -n $snapshot ]] || return 0
+	for file in i2ptunnel.config addressbook/config.txt router.config; do
+		if [[ -f $snapshot/$file ]]; then
+			mv "$snapshot/$file" "$BACKEND_DATA_DIR/$file" || {
+				router_error "$(router_t error.effective-config "$snapshot")"
+				return 1
+			}
+		fi
+	done
+	rm -rf "$snapshot"
+}
+
 # An instance belongs to this installation only when its exact screen PID,
 # kernel creation time and local working directory match the saved identity.
 # Old name-only sessions are intentionally treated as unmanaged.

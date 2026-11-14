@@ -325,61 +325,194 @@ function Invoke-Install {
     Show-Summary
 }
 
+function Start-ConfiguredRouter {
+    param([bool]$AllowExternal = $false)
+    if ($script:NoStart) { return $true }
+    if (-not (Start-Router) -or -not (Wait-RouterProxy -TimeoutSeconds $script:ProxyTimeout) -or
+        (-not $AllowExternal -and -not (Test-RouterManaged))) {
+        Write-RouterError (Get-I18nMessage 'error.effective-config' @((Get-RouterHttpProxy)))
+        return $false
+    }
+    return $true
+}
+
+function Restore-BrowserAfterConfigure {
+    $backup = Join-Path $script:I2PD_BROWSER_ROOT '.browser-old'
+    $browser = Join-Path $script:I2PD_BROWSER_ROOT 'browser'
+    $failed = Join-Path $script:I2PD_BROWSER_ROOT '.browser-switch-failed'
+    if (-not (Test-Path -LiteralPath $backup)) { return $true }
+    foreach ($name in @('lock', '.parentlock', 'parent.lock')) {
+        if (Get-Item -LiteralPath (Join-Path $browser "data/$name") -Force -ErrorAction SilentlyContinue) {
+            Write-RouterError (Get-I18nMessage 'error.effective-config' @($backup))
+            return $false
+        }
+    }
+    if (Test-Path -LiteralPath $failed) { return $false }
+    try {
+        if (Test-Path -LiteralPath $browser) { [IO.Directory]::Move($browser, $failed) }
+        [IO.Directory]::Move($backup, $browser)
+        return $true
+    }
+    catch { return $false }
+}
+
 function Invoke-Configure {
-    $backend = $script:OptionRouter
-    $source = $script:OptionSource
+    $lock = Join-Path $script:I2PD_BROWSER_ROOT '.browser-switch.lock'
+    $stream = $null
+    try {
+        $stream = [IO.File]::Open($lock, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    }
+    catch {
+        Write-RouterError (Get-I18nMessage 'error.effective-config' @($lock))
+        exit 1
+    }
+    try {
+        $buildLock = Join-Path $script:I2PD_BROWSER_ROOT '.browser-build.lock'
+        if (Get-Item -LiteralPath $buildLock -Force -ErrorAction SilentlyContinue) {
+            Write-RouterError (Get-I18nMessage 'error.effective-config' @($buildLock))
+            exit 1
+        }
+        Invoke-ConfigureTransaction
+    }
+    finally {
+        $stream.Dispose()
+        Remove-Item -LiteralPath $lock -Force
+    }
+}
+
+function Invoke-ConfigureTransaction {
+    foreach ($path in @('.browser-old', '.browser-switch-failed')) {
+        $existing = Join-Path $script:I2PD_BROWSER_ROOT $path
+        if (Get-Item -LiteralPath $existing -Force -ErrorAction SilentlyContinue) {
+            Write-RouterError (Get-I18nMessage 'error.effective-config' @($existing))
+            exit 1
+        }
+    }
     $current = Get-RouterConf
+    if (-not $current) { $current = $script:I2P_ROUTER_DEFAULT }
     $currentSource = Get-RouterConfSource
-
-    if (-not $backend -and $current) { $backend = $current }
-    if (-not $backend) { $backend = $script:I2P_ROUTER_DEFAULT }
-    if (-not (Assert-RouterBackend $backend)) { exit 1 }
-
-    if (-not $source -and $currentSource) { $source = $currentSource }
-    if (-not $source) { $source = $script:I2P_ROUTER_SOURCE_DEFAULT }
-    if (-not (Assert-RouterSource $source)) { exit 1 }
-
-    # Validate and prepare the new backend before stopping the old one.
-    # A missing dependency must not leave the user without a router or
-    # persist a selection that cannot work.
-    $script:ROUTER_SOURCE = $source
-    if (-not (Import-RouterBackend $backend)) { exit 1 }
-    if (-not (Confirm-BackendAvailable)) { exit 1 }
-    if (-not (Invoke-RouterPrepareConfig)) { exit 1 }
-
-    if ($current -and (Test-RouterBackend $current) -and
-        ($current -ne $backend -or $currentSource -ne $source)) {
-        Write-RouterLog "Switching from $(Get-RouterBackendPretty $current) ($currentSource) to $(Get-RouterBackendPretty $backend) ($source)."
-        if (Import-RouterBackend $current) {
-            $script:ROUTER_SOURCE = $currentSource
-            if (Test-RouterRunning) {
-                if (Test-RouterManaged) {
-                    if (-not (Stop-Router)) { exit 1 }
+    if (-not $currentSource) { $currentSource = $script:I2P_ROUTER_SOURCE_DEFAULT }
+    $oldLanguage = Get-I2pdBrowserStoredLocale
+    if (-not $oldLanguage) { $oldLanguage = $script:I2pdBrowserLanguage }
+    $backend = if ($script:OptionRouter) { $script:OptionRouter } elseif ($current) { $current } else { $script:I2P_ROUTER_DEFAULT }
+    $source = if ($script:OptionSource) { $script:OptionSource } else { $currentSource }
+    if (-not (Assert-RouterBackend $backend) -or -not (Assert-RouterSource $source)) { exit 1 }
+    $locale = Select-I2pdBrowserLocale $script:OptionLanguage
+    if (-not $locale) { exit 2 }
+    $wasRunning = $false
+    $allowExternal = $false
+    $mustStop = $false
+    $stopped = $false
+    $snapshot = ''
+    $oldHttpPort = '4444'
+    $oldSocksPort = '4447'
+    if ($current -and (Test-RouterBackend $current)) {
+        $script:ROUTER_SOURCE = $currentSource
+        if (-not (Import-RouterBackend $current)) { exit 1 }
+        if (Test-RouterRunning) {
+            $wasRunning = $true
+            $oldHttpPort = Get-BackendConfigProxyPort 'httpproxy'
+            $oldSocksPort = Get-BackendConfigProxyPort 'socksproxy'
+            if ($current -ne $backend -or $currentSource -ne $source -or
+                $script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE -or
+                $script:ROUTER_SOCKS_PROXY_HOST_OVERRIDE -or $script:ROUTER_SOCKS_PROXY_PORT_OVERRIDE) {
+                if (-not (Test-RouterManaged)) {
+                    Write-RouterError (Get-I18nMessage 'error.router-conflict')
+                    exit 1
                 }
-                else {
-                    Write-RouterWarn "$(Get-RouterBackendPretty $current) is running but is not managed; leaving it running."
-                }
+                $mustStop = $true
             }
         }
     }
-
-    $locale = Select-I2pdBrowserLocale $script:OptionLanguage
-    if (-not $locale) {
-        Write-RouterError (Get-I18nMessage 'language.invalid' @($script:OptionLanguage))
-        exit 2
+    $script:ROUTER_SOURCE = $source
+    if (-not (Import-RouterBackend $backend) -or -not (Assert-RouterProxySettings) -or
+        -not (Confirm-BackendAvailable)) { exit 1 }
+    if ((Test-RouterRunning) -and -not (Test-RouterManaged)) {
+        if ($current -eq $backend -and $currentSource -eq $source -and
+            -not ($script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE -or
+                $script:ROUTER_SOCKS_PROXY_HOST_OVERRIDE -or $script:ROUTER_SOCKS_PROXY_PORT_OVERRIDE)) {
+            $allowExternal = $true
+        }
+        else {
+            Write-RouterError (Get-I18nMessage 'error.router-conflict')
+            exit 1
+        }
     }
     [void](Initialize-I2pdBrowserI18n $locale)
-    if (-not (Set-RouterConf -Name $backend -Source $source -Language $locale)) { exit 1 }
-    $script:ROUTER_SOURCE = $source
-    if (-not (Import-RouterBackend $backend)) { exit 1 }
-    Write-RouterLog "Selected router: $script:ROUTER_BACKEND_PRETTY ($source)"
-
-    if (-not $script:NoBrowser) {
-        if (-not (Build-BrowserIfNeeded)) { exit 1 }
+    # Download and validate the bundle before disturbing the current router.
+    $built = $true
+    $previousKeepBackup = $env:I2PD_BROWSER_KEEP_BACKUP
+    $previousConfigureBuild = $env:I2PD_BROWSER_CONFIGURE_BUILD
+    try {
+        $env:I2PD_BROWSER_KEEP_BACKUP = '1'
+        $env:I2PD_BROWSER_CONFIGURE_BUILD = '1'
+        if (-not $script:NoBrowser) { $built = Build-BrowserIfNeeded }
     }
-    if (-not (Test-BrowserProxy)) { exit 1 }
-    if (-not (Wait-ProxyOrWarn)) { exit 1 }
-    Show-Summary
+    catch { $built = $false }
+    finally {
+        $env:I2PD_BROWSER_KEEP_BACKUP = $previousKeepBackup
+        $env:I2PD_BROWSER_CONFIGURE_BUILD = $previousConfigureBuild
+    }
+    if (-not $built -or -not (Test-BrowserProxy)) {
+        [void](Restore-BrowserAfterConfigure)
+        exit 1
+    }
+    if ($mustStop) {
+        $script:ROUTER_SOURCE = $currentSource
+        if (-not (Import-RouterBackend $current) -or -not (Stop-Router)) {
+            [void](Restore-BrowserAfterConfigure)
+            exit 1
+        }
+        $stopped = $true
+    }
+    $script:ROUTER_SOURCE = $source
+    $success = $false
+    try {
+        if (-not (Import-RouterBackend $backend)) { throw 'Backend import failed' }
+        $snapshot = Save-RouterConfigSnapshot
+        $success = (Invoke-RouterPrepareConfig) -and (Start-ConfiguredRouter -AllowExternal $allowExternal) -and
+            (Set-RouterConf -Name $backend -Source $source -Language $locale)
+    }
+    catch { $success = $false }
+    if ($success) {
+        if ($snapshot) { Remove-Item -LiteralPath $snapshot -Recurse -Force }
+        $backup = Join-Path $script:I2PD_BROWSER_ROOT '.browser-old'
+        if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Recurse -Force }
+        Write-RouterLog (Get-I18nMessage 'status.selected-router' @($script:ROUTER_BACKEND_PRETTY, $source))
+        Show-Summary
+        return
+    }
+    if ($stopped -or -not $wasRunning) {
+        if ((Test-RouterRunning) -and (Test-RouterManaged)) {
+            if (-not (Stop-Router)) {
+                Write-RouterError (Get-I18nMessage 'error.configure-rollback')
+                exit 1
+            }
+        }
+    }
+    if (-not (Restore-BrowserAfterConfigure) -or -not (Restore-RouterConfigSnapshot $snapshot)) {
+        Write-RouterError (Get-I18nMessage 'error.configure-rollback')
+        exit 1
+    }
+    if ($stopped) {
+        $script:ROUTER_SOURCE = $currentSource
+        if (-not (Import-RouterBackend $current)) { exit 1 }
+        [void](Initialize-I2pdBrowserI18n $oldLanguage)
+        $script:ROUTER_HTTP_PROXY_HOST_OVERRIDE = $false
+        $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE = $false
+        $script:ROUTER_SOCKS_PROXY_HOST_OVERRIDE = $false
+        $script:ROUTER_SOCKS_PROXY_PORT_OVERRIDE = $false
+        $script:ROUTER_HTTP_PROXY_HOST = '127.0.0.1'
+        $script:ROUTER_SOCKS_PROXY_HOST = '127.0.0.1'
+        $script:ROUTER_HTTP_PROXY_PORT = $oldHttpPort
+        $script:ROUTER_SOCKS_PROXY_PORT = $oldSocksPort
+        if (-not (Start-Router)) {
+            Write-RouterError (Get-I18nMessage 'error.configure-rollback')
+            exit 1
+        }
+    }
+    Write-RouterWarn (Get-I18nMessage 'info.configure-restored')
+    exit 1
 }
 
 function Import-BackendForCommand {

@@ -31,7 +31,17 @@ does not cover router selection or installer lifecycle; use
   mislabeled bundle.
 - Builds are staged in `.browser-build/`. The previous `browser/` is
   moved to `.browser-old/` only at publish time. On success the new
-  tree replaces it; on failure the old tree remains. `browser/data/`
+  tree replaces it; ordinary move failure attempts rollback. A pre-existing
+  `.browser-old/` is preserved for recovery. `.browser-build.lock` excludes
+  concurrent builds and launchers; direct Firefox execution is outside this
+  coordination protocol. `.browser-switch.lock` protects a configure transaction.
+  The installer sets `I2PD_BROWSER_KEEP_BACKUP=1` to retain `.browser-old` until
+  commit. A build under `.browser-switch.lock` also requires the installer-only
+  `I2PD_BROWSER_CONFIGURE_BUILD=1`; check after acquiring the build lock to close
+  cross-operation races. Failed switches preserve the new bundle in `.browser-switch-failed`
+  before restoring the old bundle. Profile locks are checked before copying/publishing.
+  Linux conservatively rejects stale locks; Windows tests exclusive access to
+  `parent.lock`. `browser/data/`
   is copied into the staging tree first, then `user.js` is regenerated.
 - The tracked sources are `build/preferences/**` and
   `build/profile/**`. The builder copies them into the generated

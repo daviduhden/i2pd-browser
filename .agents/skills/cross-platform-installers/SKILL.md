@@ -45,6 +45,12 @@ PowerShell. Use `i2p-router-integration` for backend logic and
 - Selector prompts go to stderr/terminal; stdout contains only the selected
   identifier because the installer captures it. PowerShell interactive detection
   also rejects redirected stdin.
+- Validate endpoints before backend availability/preparation writes. Configure
+  preflights the bundle before stopping the previous managed router and must
+  report rollback failure rather than leaving an unexplained partial switch.
+  Hold `.browser-switch.lock` across preflight and commit; use the internal
+  `I2PD_BROWSER_KEEP_BACKUP=1` contract for browser rollback. Preserve a failed
+  new bundle in `.browser-switch-failed`; never erase existing recovery state.
 
 ## Procedure
 

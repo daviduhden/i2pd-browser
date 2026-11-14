@@ -24,7 +24,11 @@ a system installation or from a project-managed copy under `vendor/`.
   profile seed. `browser/` is generated and ignored; `browser/data/` is
   the portable Firefox profile.
 - Builds are staged in `.browser-build/` and published only after the
-  layout and proxy policy validate. A rebuild preserves `browser/data/`
+  layout, artifact metadata, and proxy policy validate. `.browser-build.lock`
+  excludes concurrent builds; an existing `.browser-old/` requires recovery.
+  `.browser-switch.lock` coordinates backend changes with launchers;
+  `I2PD_BROWSER_KEEP_BACKUP=1` retains the old bundle until configure commits.
+  Profile locks are checked before copying and publishing. A rebuild preserves `browser/data/`
   (bookmarks, history, cookies, logins, extensions) instead of deleting
   the user profile.
 - `vendor/` contains managed router releases and is ignored. `locales/`

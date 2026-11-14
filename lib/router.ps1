@@ -595,6 +595,38 @@ function Restart-Router {
 
 # Wait until the HTTP proxy accepts TCP connections. This only checks
 # local reachability, never performs any network request.
+function Save-RouterConfigSnapshot {
+    if ($script:BACKEND_NAME -ne 'i2p-java' -or -not (Test-Path $script:BACKEND_DATA_DIR)) { return '' }
+    $snapshot = Join-Path $script:BACKEND_DATA_DIR ('.configure-backup-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path (Join-Path $snapshot 'addressbook') -Force | Out-Null
+    foreach ($file in @('i2ptunnel.config', 'addressbook/config.txt', 'router.config')) {
+        $source = Join-Path $script:BACKEND_DATA_DIR $file
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $snapshot $file)
+        }
+    }
+    return $snapshot
+}
+
+function Restore-RouterConfigSnapshot {
+    param([string]$Snapshot)
+    if (-not $Snapshot) { return $true }
+    try {
+        foreach ($file in @('i2ptunnel.config', 'addressbook/config.txt', 'router.config')) {
+            $source = Join-Path $Snapshot $file
+            if (Test-Path -LiteralPath $source) {
+                [IO.File]::Replace($source, (Join-Path $script:BACKEND_DATA_DIR $file), $null)
+            }
+        }
+        Remove-Item -LiteralPath $Snapshot -Recurse -Force
+        return $true
+    }
+    catch {
+        Write-RouterError (Get-I18nMessage 'error.effective-config' @($Snapshot))
+        return $false
+    }
+}
+
 # Numeric legacy PID files do not establish ownership and are never adopted.
 # Compare creation time, executable, full command line and installation root
 # immediately before terminating a process to prevent PID reuse accidents.
