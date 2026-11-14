@@ -55,7 +55,10 @@ installations.
 Common dependencies:
 
 - **curl**: Used for downloading Firefox.
-- **tar**: For extracting compressed files.
+- **tar** and support for xz/bzip2: For extracting Firefox archives.
+- **jq**: Required for generating and validating browser policies.
+- **unzip**: Required on Linux for checking the NoScript ZIP and manifest.
+- **sha512sum** and standard GNU text tools: Required by the Linux builder.
 - **screen**: Required for managing detached router sessions.
 
 Backend specific dependencies:
@@ -68,10 +71,10 @@ Installation examples:
 
 ```sh
 # i2pd
-sudo apt install i2pd screen curl tar
+sudo apt install i2pd screen curl tar jq unzip xz-utils bzip2
 
 # I2P (Java)
-sudo apt install i2p default-jre-headless screen curl tar
+sudo apt install i2p default-jre-headless screen curl tar jq unzip xz-utils bzip2
 ```
 
 The installer can also install the missing packages for the selected

@@ -24,6 +24,13 @@ $script:I2PD_BROWSER_ROOT = $script:RepoRoot
 . (Join-Path $script:RepoRoot 'lib/i18n.ps1')
 [void](Initialize-I2pdBrowserI18n)
 
+$script:FirefoxSha512 = ''
+$script:NoScriptVersion = ''
+$script:NoScriptSha512 = ''
+$script:NoScriptUrl = 'https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi'
+$script:NoScriptExpectedSha512 = ''
+$script:FirefoxUrl = ''
+$script:FirefoxVersion = ''
 $script:Language = $script:I2pdBrowserLanguage
 $script:EsrProduct = if ($env:ESR_PRODUCT) {
     $env:ESR_PRODUCT
@@ -270,23 +277,84 @@ function Update-Configs {
         Set-Content $ini -Encoding ascii
 }
 
+function Initialize-NoScriptPin {
+    $script:NoScriptUrl = 'https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi'
+    $script:NoScriptExpectedSha512 = $env:NOSCRIPT_SHA512
+    if ($env:NOSCRIPT_XPI_URL) {
+        if ($env:NOSCRIPT_XPI_URL -cnotmatch '^https://addons\.mozilla\.org/firefox/downloads/file/[0-9]+/[A-Za-z0-9][A-Za-z0-9._-]*\.xpi$' -or
+            $script:NoScriptExpectedSha512 -notmatch '^[0-9a-fA-F]{128}$') {
+            Stop-Build (Get-I18nMessage 'error.noscript')
+        }
+        $script:NoScriptUrl = $env:NOSCRIPT_XPI_URL
+    }
+    if ($script:NoScriptExpectedSha512 -and
+        $script:NoScriptExpectedSha512 -notmatch '^[0-9a-fA-F]{128}$') {
+        Stop-Build (Get-I18nMessage 'error.noscript')
+    }
+}
+
 function Install-NoScript {
+    Initialize-NoScriptPin
     Write-BuildLog (Get-I18nMessage 'info.build.noscript')
     $extensions = Join-Path $script:BrowserDir 'browser\extensions'
     New-Item -ItemType Directory -Force -Path $extensions | Out-Null
     $target = Join-Path $extensions `
         '{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi'
-    Invoke-WebRequest -Uri (
-        'https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi'
-    ) -OutFile $target -UseBasicParsing
-
-    # AMO can return an HTML error page with a successful HTTP status.
-    # An XPI is a ZIP file, so require the ZIP magic before publishing.
-    $bytes = [IO.File]::ReadAllBytes($target)
-    if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4B) {
-        Remove-Item -Force $target
-        Stop-Build 'NoScript download is not a valid XPI.'
+    Invoke-WebRequest -Uri $script:NoScriptUrl -OutFile $target -UseBasicParsing
+    $script:NoScriptSha512 = (Get-FileHash $target -Algorithm SHA512).Hash.ToLowerInvariant()
+    if ($script:NoScriptExpectedSha512 -and
+        $script:NoScriptSha512 -ne $script:NoScriptExpectedSha512) {
+        Stop-Build (Get-I18nMessage 'error.noscript')
     }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead($target)
+    try {
+        $entries = @($zip.Entries | Where-Object FullName -eq 'manifest.json')
+        if ($entries.Count -ne 1 -or $entries[0].Length -gt 1048576) {
+            Stop-Build (Get-I18nMessage 'error.noscript')
+        }
+        $reader = New-Object IO.StreamReader($entries[0].Open())
+        try { $manifest = $reader.ReadToEnd() | ConvertFrom-Json }
+        finally { $reader.Dispose() }
+        $gecko = if ($manifest.PSObject.Properties['browser_specific_settings']) {
+            $manifest.browser_specific_settings.gecko
+        } else { $manifest.applications.gecko }
+        if ($gecko.id -ne '{73a6fe31-595d-460b-a920-fcc0f8843232}' -or
+            $manifest.version -notmatch '^[0-9]+(\.[0-9]+)*$' -or
+            $gecko.strict_min_version -notmatch '^[0-9]+(\.[0-9]+)*$') {
+            Stop-Build (Get-I18nMessage 'error.noscript')
+        }
+        $current = [version]($script:FirefoxVersion -replace 'esr$', '')
+        if ($current -lt [version]$gecko.strict_min_version) {
+            Stop-Build (Get-I18nMessage 'error.noscript')
+        }
+        if ($gecko.PSObject.Properties['strict_max_version'] -and
+            $gecko.strict_max_version -ne '*') {
+            $maximum = $gecko.strict_max_version
+            if ($maximum -notmatch '^[0-9]+(\.[0-9]+)*(\.\*)?$') {
+                Stop-Build (Get-I18nMessage 'error.noscript')
+            }
+            if ($maximum.EndsWith('.*')) {
+                $prefix = $maximum.Substring(0, $maximum.Length - 2).Split('.')
+                $parts = $current.ToString().Split('.')
+                for ($i = 0; $i -lt $prefix.Count; $i++) {
+                    if ([int]$parts[$i] -gt [int]$prefix[$i]) {
+                        Stop-Build (Get-I18nMessage 'error.noscript')
+                    }
+                    if ([int]$parts[$i] -lt [int]$prefix[$i]) { break }
+                }
+            } elseif ($current -gt [version]$maximum) {
+                Stop-Build (Get-I18nMessage 'error.noscript')
+            }
+        }
+        $script:NoScriptVersion = $manifest.version
+        # Read all entries so invalid compressed data fails before publication.
+        foreach ($entry in $zip.Entries) {
+            $stream = $entry.Open()
+            try { $stream.CopyTo([IO.Stream]::Null) } finally { $stream.Dispose() }
+        }
+    } finally { $zip.Dispose() }
 }
 
 function Format-PoliciesJson {
@@ -401,6 +469,7 @@ function Publish-Browser {
 
 function Main {
     Import-BuildArgs -Arguments $args
+    Initialize-NoScriptPin
 
     if (-not (Test-RouterProxySettings)) {
         Stop-Build 'Proxy overrides must use 127.0.0.1 and ports from 1 to 65535.'
@@ -413,6 +482,8 @@ function Main {
 
     $url = Resolve-FirefoxDownload
     $version = Get-FirefoxVersion -Url $url
+    $script:FirefoxUrl = $url
+    $script:FirefoxVersion = $version
     Write-BuildLog (Get-I18nMessage 'info.build.preparing' @($version))
     Install-Firefox -Url $url -Version $version
     Remove-UnneededFiles

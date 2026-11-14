@@ -107,6 +107,8 @@ readonly -a REQUIRED_TOOLS=(
 	awk
 	jq
 	head
+	unzip
+	sort
 )
 
 dir=""
@@ -128,6 +130,12 @@ fx_dir=""
 final_url=""
 file=""
 version=""
+firefox_sha512=""
+noscript_version=""
+noscript_sha512=""
+noscript_url="https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
+noscript_expected_sha512=""
+build_lock="$I2PD_BROWSER_ROOT/.browser-build.lock"
 ftpmirror=""
 filepath=""
 
@@ -296,20 +304,67 @@ update_configs() {
 	sed -i 's/ServerURL=.*/ServerURL=-/' "$staging_dir/application.ini"
 }
 
+initialize_noscript_pin() {
+	noscript_url="https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
+	noscript_expected_sha512="${NOSCRIPT_SHA512:-}"
+	if [[ -n ${NOSCRIPT_XPI_URL:-} ]]; then
+		[[ $NOSCRIPT_XPI_URL =~ ^https://addons\.mozilla\.org/firefox/downloads/file/[0-9]+/[A-Za-z0-9][A-Za-z0-9._-]*\.xpi$ ]] ||
+			die "$(i18n_message error.noscript)"
+		[[ $noscript_expected_sha512 =~ ^[0-9a-fA-F]{128}$ ]] ||
+			die "$(i18n_message error.noscript)"
+		noscript_url="$NOSCRIPT_XPI_URL"
+	fi
+	if [[ -n $noscript_expected_sha512 && ! $noscript_expected_sha512 =~ ^[0-9a-fA-F]{128}$ ]]; then
+		die "$(i18n_message error.noscript)"
+	fi
+	noscript_expected_sha512="${noscript_expected_sha512,,}"
+}
+
 download_noscript() {
+	initialize_noscript_pin
 	local xpi="$staging_dir/browser/extensions"
 	xpi+="/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi"
 
 	log "$(i18n_message info.build.noscript)"
 	mkdir -p "$staging_dir/browser/extensions"
-	curl -L -f -# -o "$xpi" \
-		"https://addons.mozilla.org/firefox/\
-downloads/latest/noscript/latest.xpi"
+	curl -L -f -# -o "$xpi" "$noscript_url"
+	noscript_sha512="$(sha512sum "$xpi" | awk '{print $1}')"
+	if [[ -n $noscript_expected_sha512 && $noscript_sha512 != "$noscript_expected_sha512" ]]; then
+		die "$(i18n_message error.noscript)"
+	fi
 
 	# AMO can return an HTML error page with a successful HTTP status.
-	# An XPI is a ZIP file, so require the ZIP magic before publishing.
-	if [[ ! -s $xpi ]] || [[ $(head -c 2 "$xpi") != "PK" ]]; then
-		die "NoScript download is not a valid XPI."
+	# Verify the archive, unique manifest, identity and declared ESR compatibility.
+	local manifest minimum maximum current
+	unzip -tqq "$xpi" >/dev/null || die "$(i18n_message error.noscript)"
+	[[ $(unzip -Z1 "$xpi" | awk '$0 == "manifest.json" {n++} END {print n+0}') == 1 ]] ||
+		die "$(i18n_message error.noscript)"
+	manifest="$(unzip -p "$xpi" manifest.json | head -c 1048577)" ||
+		die "$(i18n_message error.noscript)"
+	(("${#manifest}" <= 1048576)) || die "$(i18n_message error.noscript)"
+	jq -se '
+		length == 1 and (.[0] |
+		(.browser_specific_settings.gecko // .applications.gecko) as $g |
+		$g.id == "{73a6fe31-595d-460b-a920-fcc0f8843232}" and
+		(.version | type == "string" and test("^[0-9]+([.][0-9]+)*$")) and
+		($g.strict_min_version | type == "string" and test("^[0-9]+([.][0-9]+)*$")) and
+		(($g.strict_max_version // "*") | test("^([0-9]+([.][0-9]+)*([.][*])?|[*])$")))
+	' <<<"$manifest" >/dev/null || die "$(i18n_message error.noscript)"
+	noscript_version="$(jq -r '.version' <<<"$manifest")"
+	minimum="$(jq -r '(.browser_specific_settings.gecko // .applications.gecko).strict_min_version' <<<"$manifest")"
+	maximum="$(jq -r '(.browser_specific_settings.gecko // .applications.gecko).strict_max_version // "*"' <<<"$manifest")"
+	current="${version%esr}"
+	[[ $(printf '%s\n%s\n' "$minimum" "$current" | sort -V | head -n1) == "$minimum" ]] ||
+		die "$(i18n_message error.noscript)"
+	if [[ $maximum != '*' ]]; then
+		if [[ $maximum == *'*' ]]; then
+			maximum="${maximum//\*/999999}"
+			[[ $(printf '%s\n%s\n' "$maximum" "$current" | sort -V | head -n1) == "$current" ]] ||
+				die "$(i18n_message error.noscript)"
+		else
+			[[ $(printf '%s\n%s\n' "$maximum" "$current" | sort -V | head -n1) == "$current" ]] ||
+				die "$(i18n_message error.noscript)"
+		fi
 	fi
 }
 
@@ -384,6 +439,7 @@ publish_browser() {
 
 main() {
 	parse_args "$@"
+	initialize_noscript_pin
 	router_validate_proxy_settings ||
 		die "Proxy overrides must use 127.0.0.1 and ports from 1 to 65535."
 	setup_workdir
@@ -406,4 +462,6 @@ main() {
 	log "$(i18n_message info.build.complete)"
 }
 
-main "$@"
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+	main "$@"
+fi

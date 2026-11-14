@@ -163,8 +163,9 @@ post-build smoke test in this repository.
 - **Marker timing.** The locale marker is written in staging and
   published only after layout and proxy validation. Do not move it
   earlier.
-- **NoScript structural check.** ZIP magic proves the download is not
-  an HTML error page; it does not prove authenticity or version.
+- **NoScript checks.** ZIP integrity, a unique bounded manifest, expected ID,
+  numeric version and Gecko compatibility are checked. These do not establish
+  independent signature authenticity or prove activation in Firefox.
 - **Checksum scope.** SHA-512 covers the Mozilla archive/installer.
   It does not authenticate the checksum origin or cover NoScript.
 - **No version pin.** Two builds at different times can use different

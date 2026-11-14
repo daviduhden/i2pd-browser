@@ -45,8 +45,11 @@ does not cover router selection or installer lifecycle; use
   `127.0.0.1:4444` is only the default.
 - NoScript is downloaded from AMO's `latest.xpi` URL, written to
   `browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi`,
-  and checked for the ZIP magic bytes. Its version and signature are
-  not verified.
+  and checked as a ZIP with exactly one bounded JSON manifest, the expected ID,
+  numeric version, and compatible Gecko version limits. The version and SHA-512
+  are recorded, but its signature is not independently verified. An explicit
+  `NOSCRIPT_XPI_URL` must use AMO's HTTPS `/firefox/downloads/file/` artifact path
+  and requires an independently trusted `NOSCRIPT_SHA512` before downloading.
 - The locale marker is `browser/.i2pd-browser-locale`. It is created in
   the staging tree and published only after the bundle passes layout
   and proxy-policy validation. `browser/data/user.js` sets
@@ -120,7 +123,8 @@ they worked:
 - `browser/defaults/pref/autoconfig.js`, `browser/i2pd-browser.cfg`,
   and `browser/browser/override.ini` exist.
 - `browser/browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi`
-  starts with `PK`.
+  contains the expected ID/version/compatibility manifest and matches its
+  recorded SHA-512; do not use ZIP magic as the complete verification.
 - A pre-existing profile's bookmarks or history are still present when
   testing profile preservation.
 
@@ -129,11 +133,13 @@ change. Use a disposable clone or a backed-up profile.
 
 ## Common problems
 
-- **No version pin.** Both builders follow the current ESR release.
-  Do not claim reproducible builds.
+- **Floating defaults.** ESR product identifiers can select a pinned Mozilla
+  release and an explicit AMO artifact URL plus SHA-512 can pin NoScript. The
+  defaults still follow latest releases; do not claim reproducibility without
+  recording every input and verifying the same artifacts.
 - **Checksum, not signature.** SHA-512 detects corruption or a mirror
-  mismatch; it does not authenticate Mozilla. NoScript has only a
-  structural ZIP check.
+  mismatch; it does not independently authenticate Mozilla. NoScript ZIP,
+  identity and compatibility checks do not establish signature trust.
 - **PowerShell argument handling.** `Main` must be called as
   `Main @args`; calling it with no arguments silently drops
   `--language` and `--help`.
