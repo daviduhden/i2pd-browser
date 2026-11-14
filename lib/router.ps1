@@ -206,15 +206,17 @@ function Set-RouterConf {
     if (-not $Language) { return $false }
 
     $file = Get-RouterConfFile
-    $lines = if (Test-Path $file) {
-        Get-Content -Path $file | Where-Object {
+    # Keep zero, one, and many preserved lines as an array; a scalar string
+    # would concatenate the managed keys instead of writing separate records.
+    [string[]]$lines = @(if (Test-Path -LiteralPath $file) {
+        Get-Content -LiteralPath $file -Encoding UTF8 | Where-Object {
             $_ -notmatch '^\s*I2P_ROUTER\s*=' -and
             $_ -notmatch '^\s*I2P_ROUTER_SOURCE\s*=' -and
             $_ -notmatch '^\s*I2PD_BROWSER_LANGUAGE\s*='
         }
     } else {
         @('# I2Pd Browser configuration')
-    }
+    })
     $lines += @(
         "I2P_ROUTER=$Name"
         "I2P_ROUTER_SOURCE=$Source"

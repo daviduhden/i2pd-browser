@@ -102,11 +102,49 @@ try {
     Assert-Equal (Select-I2pdBrowserLocale) 'es-ES'
     Assert-Equal (Select-I2pdBrowserLocale 'ru') 'ru'
     . (Join-Path $root 'lib/router.ps1')
-    [void](Set-RouterConf -Name i2pd -Source system -Language ru)
+    if (-not (Set-RouterConf -Name i2pd -Source system -Language ru)) {
+        throw 'Router language configuration could not be persisted.'
+    }
     Assert-Equal (Get-RouterConfLanguage) 'ru'
     if (-not (Get-Content $env:I2PD_BROWSER_CONF -Raw).Contains(
             'CUSTOM_SETTING=preserved')) {
         throw 'Configuration preservation failed.'
+    }
+    # Also cover first-time publication through File.Move.
+    Remove-Item -LiteralPath $env:I2PD_BROWSER_CONF
+    if (-not (Set-RouterConf -Name i2pd -Source system -Language en-US)) {
+        throw 'Initial router configuration could not be created.'
+    }
+    Assert-Equal (Get-RouterConf) 'i2pd'
+    Assert-Equal (Get-RouterConfSource) 'system'
+    Assert-Equal (Get-RouterConfLanguage) 'en-US'
+
+    # Replacing an existing file must work in Windows PowerShell 5.1 and 7.
+    # Pipeline output changes shape for zero/one/many records unless the
+    # production writer explicitly preserves an array.
+    foreach ($preservedCount in @(0, 1, 2)) {
+        $preserved = @()
+        for ($index = 0; $index -lt $preservedCount; $index++) {
+            $preserved += "CUSTOM_$index=value_$index$([char]0x00E9)"
+        }
+        $fixture = @('I2P_ROUTER=i2pd', 'I2P_ROUTER_SOURCE=system',
+            'I2PD_BROWSER_LANGUAGE=es-ES') + $preserved
+        [IO.File]::WriteAllLines($env:I2PD_BROWSER_CONF, [string[]]$fixture,
+            [Text.UTF8Encoding]::new($false))
+        if (-not (Set-RouterConf -Name i2p-java -Source vendored -Language ru)) {
+            throw "Configuration replacement failed with $preservedCount retained lines."
+        }
+        $actual = [IO.File]::ReadAllLines($env:I2PD_BROWSER_CONF)
+        Assert-Equal (Get-RouterConf) 'i2p-java'
+        Assert-Equal (Get-RouterConfSource) 'vendored'
+        Assert-Equal (Get-RouterConfLanguage) 'ru'
+        Assert-Equal $actual.Count (3 + $preservedCount)
+        foreach ($line in $preserved) {
+            if ($actual -cnotcontains $line) { throw "Lost preserved line: $line" }
+        }
+        if (@(Get-ChildItem -LiteralPath $tmp -Filter '*.tmp.*').Count -ne 0) {
+            throw 'Configuration replacement leaked temporary files.'
+        }
     }
     Write-Host 'PowerShell i18n tests passed'
 }

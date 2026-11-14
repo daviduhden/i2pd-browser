@@ -116,6 +116,10 @@ file locales/*.properties
 Check duplicate keys, empty values and placeholder parity as well as key
 parity. PowerShell tests must cover fallback and explicit/stored/environment
 precedence with the script root initialized before importing the loader.
+Configuration persistence tests must assert the writer's success and read back
+all managed keys after replacing existing files with zero, one, and multiple
+unrelated lines. Keep those lines as an explicit array in PowerShell; a
+single-item pipeline result is a scalar string.
 For static-only authorization, inspect catalogs and tests without executing the
 suites, and report those tests as not run.
 

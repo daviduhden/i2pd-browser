@@ -133,7 +133,11 @@ inspection.
   `[System.Management.Automation.Language.NullString]::Value` as the optional
   `File.Replace` backup path: PowerShell converts a plain `$null` to an empty
   string, which .NET rejects. Apply the same rule to policy and identity writes
-  and Java configuration recovery.
+  and Java configuration recovery. Keep retained configuration lines as an
+  explicit string array; pipeline results with one record otherwise become a
+  scalar and `+=` concatenates managed settings into the same record. Read
+  preserved records explicitly as UTF-8 on Windows PowerShell 5.1; its default
+  text encoding differs from PowerShell 7.
 - **Relative paths.** `-profile data` is relative to the caller's
   working directory unless made absolute.
 - **`winget` chains.** Capture each command's exit code; returning only
