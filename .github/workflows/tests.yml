@@ -1,6 +1,7 @@
+---
 name: Tests (Linux and Windows)
 
-on:
+'on':
   workflow_dispatch:
 
 permissions:
@@ -41,7 +42,8 @@ jobs:
         shell: ${{ matrix.shell }}
     steps:
       - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        # actions/checkout v7.0.1, pinned to its immutable commit.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
@@ -52,7 +54,8 @@ jobs:
             command -v "$tool" >/dev/null
           done
           bash -n install.bash build/build.bash build/scripts/*.bash \
-            lib/*.bash lib/backends/*.bash tests/*.bash i2pd/*.bash i2p-java/*.bash
+            lib/*.bash lib/backends/*.bash tests/*.bash \
+            i2pd/*.bash i2p-java/*.bash
           jq -e . build/preferences/distribution/policies.json >/dev/null
 
       - name: Bash localization tests
@@ -83,7 +86,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSVersionTable.PSVersion.ToString()
           $files = @(Get-Item -LiteralPath 'install.ps1') + @(
-            Get-ChildItem -Path build, lib, tests, i2pd, i2p-java -Recurse -Filter '*.ps1' -File
+            Get-ChildItem -Path build, lib, tests, i2pd, i2p-java `
+              -Recurse -Filter '*.ps1' -File
           )
           foreach ($file in $files) {
             $tokens = $null

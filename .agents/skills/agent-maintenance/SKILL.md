@@ -73,7 +73,7 @@ specialized agent definition files.
 The manual-only workflow pins each external action to an immutable
 40-character commit SHA; tags and branches are not acceptable because they can
 be moved. When changing a pin, verify the release SHA first and update the
-`uses:` line and its trailing `# vX.Y.Z` comment in the same edit. Keep the
+`uses:` line and its adjacent version comment in the same edit. Keep the
 workflow's manual-only triggers, owner/re-run job gate, and read-only permissions
 unchanged.
 When separately authorized to change validation inputs or commands, retain safe

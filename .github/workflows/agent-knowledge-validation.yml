@@ -1,10 +1,12 @@
+---
 name: Agent Knowledge Validation
 
-on:
+'on':
   workflow_dispatch:
     inputs:
       scope:
-        description: Validate committed changes (range) or checkout structure (worktree)
+        description: >-
+          Validate committed changes (range) or checkout structure (worktree)
         type: choice
         options:
           - range
@@ -16,7 +18,8 @@ on:
         type: string
         required: false
       head:
-        description: Head revision for range comparison (empty uses checked-out HEAD)
+        description: >-
+          Head revision for range comparison (empty uses checked-out HEAD)
         type: string
         required: false
 
@@ -38,7 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository history
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        # actions/checkout v7.0.1, pinned to its immutable commit.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -55,17 +59,26 @@ jobs:
           case "$VALIDATION_SCOPE" in
             range)
               if [[ -z "$VALIDATION_BASE" ]]; then
-                printf '%s\n' 'The base input is required for range validation.' >&2
+                printf '%s\n' \
+                  'The base input is required for range validation.' >&2
                 exit 2
               fi
-              base_commit="$(git rev-parse --verify --end-of-options "${VALIDATION_BASE}^{commit}")"
-              head_commit="$(git rev-parse --verify --end-of-options "${VALIDATION_HEAD:-HEAD}^{commit}")"
+              base_ref="${VALIDATION_BASE}^{commit}"
+              head_ref="${VALIDATION_HEAD:-HEAD}^{commit}"
+              base_commit="$(
+                git rev-parse --verify --end-of-options "$base_ref"
+              )"
+              head_commit="$(
+                git rev-parse --verify --end-of-options "$head_ref"
+              )"
               perl scripts/validate-agent-knowledge.pl --scope range \
                 --base "$base_commit" --head "$head_commit"
               ;;
             worktree)
               if [[ -n "$VALIDATION_BASE" || -n "$VALIDATION_HEAD" ]]; then
-                printf '%s\n' 'Base and head inputs are only accepted with range validation.' >&2
+                printf '%s %s\n' \
+                  'Base and head inputs are only accepted' \
+                  'with range validation.' >&2
                 exit 2
               fi
               perl scripts/validate-agent-knowledge.pl --scope worktree
