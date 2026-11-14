@@ -202,6 +202,7 @@ function Install-Firefox {
     if ($actual -ne $expected.ToUpperInvariant()) {
         Stop-Build (Get-I18nMessage 'error.checksum')
     }
+    $script:FirefoxSha512 = $actual.ToLowerInvariant()
     Write-BuildLog (Get-I18nMessage 'info.build.checksum-ok')
 
     Write-BuildLog 'Installing Firefox'
@@ -222,8 +223,8 @@ function Install-Firefox {
     if (Test-Path $oldData) {
         Get-ChildItem -Path $oldData -Force | Copy-Item `
             -Destination $data -Recurse -Force
-        # Stale profile locks must not make the new bundle look as if
-        # it is already in use.
+        # Remove only copied locks after the idle-profile guard.
+        # Never remove locks from the published profile.
         foreach ($lock in @('.parentlock', 'parent.lock', 'lock')) {
             $lockPath = Join-Path $data $lock
             if (Test-Path $lockPath) { Remove-Item -Force $lockPath }
@@ -402,6 +403,9 @@ function Copy-LaunchScripts {
 
 function Test-BundleLayout {
     $required = @(
+        'firefox.exe'
+        '.i2pd-browser-build.json'
+        'browser\extensions\{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi'
         'application.ini'
         'i2pd-browser.cfg'
         'defaults\pref\autoconfig.js'
@@ -426,28 +430,25 @@ function Test-BundleLayout {
                 ($missing -join ', ')))
     }
 
-    # The proxy endpoint lives only in policies.json. Refuse to publish
-    # a bundle that could run Firefox in manual proxy mode without it.
-    $policies = Get-Content (
-        Join-Path $script:BrowserDir 'distribution\policies.json'
-    ) -Raw | ConvertFrom-Json
-    $proxy = $policies.policies.Proxy
-    $expectedProxy = Get-RouterHttpProxy
-    if ($proxy.Mode -ne 'manual' -or $proxy.Locked -ne $true -or
-        $proxy.HTTPProxy -ne $expectedProxy -or
-        $proxy.SSLProxy -ne $expectedProxy -or
-        $proxy.UseProxyForDNS -ne $true -or $proxy.Passthrough -ne '') {
-        Stop-Build (Get-I18nMessage 'error.bundle-validation' @(
-                'Proxy policy'))
+    if (-not (Test-BrowserProxyPolicy -Path (Join-Path $script:BrowserDir 'distribution\policies.json') -Endpoint (Get-RouterHttpProxy))) {
+        Stop-Build (Get-I18nMessage 'error.bundle-validation' @('Proxy policy'))
+    }
+    $manifest = Get-Content (Join-Path $script:BrowserDir '.i2pd-browser-build.json') -Raw | ConvertFrom-Json
+    if ($manifest.schema -ne 1 -or $manifest.built_epoch -le 0 -or
+        $manifest.http_proxy -ne (Get-RouterHttpProxy) -or
+        -not $manifest.firefox.version -or -not $manifest.noscript.version -or
+        $manifest.firefox.sha512 -notmatch '^[0-9a-f]{128}$' -or
+        $manifest.noscript.sha512 -notmatch '^[0-9a-f]{128}$' -or
+        $manifest.noscript.url -notlike 'https://addons.mozilla.org/firefox/downloads/*' -or
+        $manifest.firefox.url -notlike 'https://*') {
+        Stop-Build (Get-I18nMessage 'error.bundle-metadata')
     }
 }
 
 function Publish-Browser {
+    Assert-ProfileIdle
     $backup = Join-Path $script:RepoRoot '.browser-old'
     if (Test-Path $script:FinalBrowserDir) {
-        if (Test-Path $backup) {
-            Remove-Item -Recurse -Force $backup
-        }
         Move-Item -Path $script:FinalBrowserDir -Destination $backup `
             -ErrorAction Stop
     }
@@ -462,9 +463,45 @@ function Publish-Browser {
         }
         throw
     }
-    if (Test-Path $backup) {
+    # Installer transactions retain the old bundle until router commit succeeds.
+    if ($env:I2PD_BROWSER_KEEP_BACKUP -ne '1' -and (Test-Path $backup)) {
         Remove-Item -Recurse -Force $backup
     }
+}
+
+function Assert-ProfileIdle {
+    foreach ($name in @('.parentlock', 'parent.lock', 'lock')) {
+        $path = Join-Path $script:FinalBrowserDir ('data/' + $name)
+        if (Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue) {
+            if ($name -ne 'parent.lock') {
+                Stop-Build (Get-I18nMessage 'error.profile-active' @($path))
+            }
+            # An existing Windows lock file can survive normal shutdown.
+            # Exclusive open tests its live OS lock without deleting it.
+            $profileLock = $null
+            try {
+                $profileLock = [IO.File]::Open($path, [IO.FileMode]::Open,
+                    [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+            } catch { Stop-Build (Get-I18nMessage 'error.profile-active' @($path)) }
+            finally { if ($null -ne $profileLock) { $profileLock.Dispose() } }
+        }
+    }
+}
+
+function Write-BuildManifest {
+    $now = [DateTimeOffset]::UtcNow
+    $manifest = @{
+        schema = 1; built_at = $now.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        built_epoch = $now.ToUnixTimeSeconds(); platform = (Get-FirefoxOs)
+        locale = $script:Language; http_proxy = (Get-RouterHttpProxy)
+        firefox = @{version = $script:FirefoxVersion; product = $script:EsrProduct
+            url = $script:FirefoxUrl; sha512 = $script:FirefoxSha512}
+        noscript = @{version = $script:NoScriptVersion; sha512 = $script:NoScriptSha512
+            url = $script:NoScriptUrl}
+    }
+    $utf8 = New-Object Text.UTF8Encoding $false
+    [IO.File]::WriteAllText((Join-Path $script:BrowserDir '.i2pd-browser-build.json'),
+        ($manifest | ConvertTo-Json -Depth 10), $utf8)
 }
 
 function Main {
@@ -480,6 +517,7 @@ function Main {
                 $script:EsrProduct))
     }
 
+    Assert-ProfileIdle
     $url = Resolve-FirefoxDownload
     $version = Get-FirefoxVersion -Url $url
     $script:FirefoxUrl = $url
@@ -493,6 +531,7 @@ function Main {
     Format-PoliciesJson
     Copy-LaunchScripts
     Set-FirefoxLocale
+    Write-BuildManifest
     Test-BundleLayout
     Publish-Browser
     Write-BuildLog (Get-I18nMessage 'info.build.complete')
@@ -502,5 +541,31 @@ function Main {
 . (Join-Path $script:RepoRoot 'lib/router.ps1')
 . (Join-Path $script:RepoRoot 'lib/browser-policy.ps1')
 
-Main @args
-exit 0
+if ($MyInvocation.InvocationName -ne '.') {
+    $buildLock = Join-Path $script:RepoRoot '.browser-build.lock'
+    $lockStream = $null
+    try {
+        # --help returns before obtaining a lock or performing any writes.
+        if (@($args | Where-Object { $_ -in @('--help', '-h') }).Count -gt 0) { Main @args; exit 0 }
+        try {
+            $lockStream = [IO.File]::Open($buildLock, [IO.FileMode]::CreateNew,
+                [IO.FileAccess]::Write, [IO.FileShare]::None)
+        } catch { Stop-Build (Get-I18nMessage 'error.build-locked' @($buildLock)) }
+        $switchLock = Join-Path $script:RepoRoot '.browser-switch.lock'
+        if ((Get-Item -LiteralPath $switchLock -Force -ErrorAction SilentlyContinue) -and
+            ($env:I2PD_BROWSER_CONFIGURE_BUILD -ne '1' -or $env:I2PD_BROWSER_KEEP_BACKUP -ne '1')) {
+            Stop-Build (Get-I18nMessage 'error.build-locked' @($switchLock))
+        }
+        if (Get-Item -LiteralPath (Join-Path $script:RepoRoot '.browser-old') -Force -ErrorAction SilentlyContinue) {
+            Stop-Build (Get-I18nMessage 'error.build-locked' @('.browser-old'))
+        }
+        Main @args
+    } finally {
+        if ($null -ne $lockStream) {
+            $lockStream.Dispose()
+            Remove-Item -LiteralPath $buildLock -Force
+        }
+    }
+    exit 0
+
+}

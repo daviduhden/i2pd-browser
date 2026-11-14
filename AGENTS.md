@@ -28,7 +28,8 @@ a system installation or from a project-managed copy under `vendor/`.
   (bookmarks, history, cookies, logins, extensions) instead of deleting
   the user profile.
 - `vendor/` contains managed router releases and is ignored. `locales/`
-  contains data-only message catalogs. `tests/` contains the i18n tests.
+  contains data-only message catalogs. `tests/` contains i18n, proxy-policy,
+  router-safety, build-safety, and validator contract checks.
 
 ## Supported targets
 

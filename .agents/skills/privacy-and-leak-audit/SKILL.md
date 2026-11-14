@@ -141,6 +141,9 @@ Do not send traffic to a clearnet test site. Use the existing
 - **Desktop commands.** Use the desktop serializer, not `bash -c` with an
   interpolated path. Desktop escaping, shell quoting and sed replacement
   escaping are distinct layers. `--help` must not modify the installation.
+- **Maintenance.** Bundle age warnings read local metadata only; do not add
+  background version requests. Defender exclusions are not automatic. Java
+  installation requires an independently trusted supplied SHA-512.
 - **Version-dependent policies.** `AIControls`, `LocalNetworkAccess`,
   `BrowserDataBackup`, `IPProtectionAvailable`, `VisualSearchEnabled`,
   and `XSLTEnabled` may be ignored by older ESR builds. A newer ESR

@@ -236,6 +236,7 @@ verify_checksum() {
 	recv_sum="$(awk -v f="$filepath" \
 		'$NF==f {print $1; exit}' SHA512SUMS)"
 	file_sum="$(sha512sum "$file" | awk '{print $1}')"
+	firefox_sha512="$file_sum"
 
 	if [[ -z $recv_sum || $recv_sum != "$file_sum" ]]; then
 		die "$(i18n_message error.checksum)"
@@ -263,8 +264,8 @@ extract_archive() {
 	# cookies, logins and extensions stored in browser/data.
 	if [[ -d ../browser/data ]]; then
 		cp -a ../browser/data/. "$staging_dir/data/"
-		# Stale profile locks must not make the new bundle look as if
-		# it is already in use.
+		# Remove only copied locks in staging, after the idle-profile guard.
+		# Never remove locks from the published profile.
 		rm -f "$staging_dir/data/.parentlock" \
 			"$staging_dir/data/parent.lock" \
 			"$staging_dir/data/lock"
@@ -302,6 +303,44 @@ update_configs() {
 		die "Firefox application.ini is missing."
 	sed -i 's/Enabled=1/Enabled=0/g' "$staging_dir/application.ini"
 	sed -i 's/ServerURL=.*/ServerURL=-/' "$staging_dir/application.ini"
+}
+
+check_profile_idle() {
+	local lock
+	for lock in "$I2PD_BROWSER_ROOT/browser/data/"{.parentlock,parent.lock,lock}; do
+		if [[ -e $lock || -L $lock ]]; then
+			die "$(i18n_message error.profile-active "$lock")"
+		fi
+	done
+}
+
+acquire_build_lock() {
+	mkdir "$build_lock" 2>/dev/null ||
+		die "$(i18n_message error.build-locked "$build_lock")"
+	trap 'rmdir "$build_lock"' EXIT
+	local switch_lock="$I2PD_BROWSER_ROOT/.browser-switch.lock"
+	if [[ -e $switch_lock || -L $switch_lock ]]; then
+		if [[ ${I2PD_BROWSER_CONFIGURE_BUILD:-0} != 1 || ${I2PD_BROWSER_KEEP_BACKUP:-0} != 1 ]]; then
+			die "$(i18n_message error.build-locked "$switch_lock")"
+		fi
+	fi
+	check_profile_idle
+	# Interrupted publication requires recovery, never deletion of the backup.
+	[[ ! -e ../.browser-old && ! -L ../.browser-old ]] ||
+		die "$(i18n_message error.build-locked ../.browser-old)"
+}
+
+write_build_manifest() {
+	jq -n --arg firefox "$version" --arg product "$ESR_PRODUCT" \
+		--arg platform "$fx_dir" --arg locale "$language" --arg http_proxy "$(router_http_proxy)" \
+		--arg url "$final_url" --arg hash "$firefox_sha512" \
+		--arg noscript "$noscript_version" --arg xpi_hash "$noscript_sha512" --arg xpi_url "$noscript_url" \
+		--arg built_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+		--argjson built_epoch "$(date +%s)" \
+		'{schema:1,built_at:$built_at,built_epoch:$built_epoch,platform:$platform,
+		locale:$locale,http_proxy:$http_proxy,firefox:{version:$firefox,product:$product,url:$url,sha512:$hash},
+		noscript:{version:$noscript,sha512:$xpi_hash,url:$xpi_url}}' \
+		>"$staging_dir/.i2pd-browser-build.json"
 }
 
 initialize_noscript_pin() {
@@ -383,6 +422,9 @@ validate_bundle() {
 	local required expected_proxy
 	expected_proxy="$(router_http_proxy)"
 	local -a required_files=(
+		firefox
+		.i2pd-browser-build.json
+		"browser/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi"
 		application.ini
 		i2pd-browser.cfg
 		defaults/pref/autoconfig.js
@@ -410,6 +452,19 @@ validate_bundle() {
 	# router endpoint selected for this build.
 	browser_policy_validate "$staging_dir/distribution/policies.json" "$expected_proxy" ||
 		die "$(i18n_message error.bundle-validation "Proxy policy")"
+	[[ -x $staging_dir/firefox ]] || die "$(i18n_message error.bundle-validation firefox)"
+	jq -se --arg endpoint "$expected_proxy" '
+		length == 1 and (.[0] |
+		.schema == 1 and (.built_epoch | type == "number" and . > 0) and
+		.http_proxy == $endpoint and
+		(.firefox.version | type == "string" and length > 0) and
+		(.noscript.version | type == "string" and length > 0) and
+		(.firefox.sha512 | test("^[0-9a-f]{128}$")) and
+		(.noscript.sha512 | test("^[0-9a-f]{128}$")) and
+		(.noscript.url | startswith("https://addons.mozilla.org/firefox/downloads/")) and
+		(.firefox.url | startswith("https://")))
+	' "$staging_dir/.i2pd-browser-build.json" >/dev/null ||
+		die "$(i18n_message error.bundle-metadata)"
 }
 
 copy_launch_scripts() {
@@ -425,16 +480,19 @@ copy_launch_scripts() {
 publish_browser() {
 	local final="../browser"
 	local backup="../.browser-old"
+	check_profile_idle
 
 	if [[ -e $final ]]; then
-		rm -rf "$backup"
 		mv "$final" "$backup" || die "Could not move the old browser aside."
 	fi
 	if ! mv "$staging_dir" "$final"; then
 		[[ -d $backup ]] && mv "$backup" "$final"
 		die "Could not publish the new browser."
 	fi
-	rm -rf "$backup"
+	# Installer transactions retain the old bundle until router commit succeeds.
+	if [[ ${I2PD_BROWSER_KEEP_BACKUP:-0} != 1 ]]; then
+		rm -rf "$backup"
+	fi
 }
 
 main() {
@@ -444,6 +502,7 @@ main() {
 		die "Proxy overrides must use 127.0.0.1 and ports from 1 to 65535."
 	setup_workdir
 	check_tools
+	acquire_build_lock
 	detect_arch
 	resolve_latest_firefox
 	download_firefox
@@ -456,6 +515,7 @@ main() {
 	format_distribution_policy_json
 	copy_launch_scripts
 	write_locale_preference
+	write_build_manifest
 	validate_bundle
 	publish_browser
 	browser_desktop_entry scripts/start-i2pd-browser.desktop ../start-i2pd-browser.desktop "$I2PD_BROWSER_ROOT/browser/start-i2pd-browser.bash"

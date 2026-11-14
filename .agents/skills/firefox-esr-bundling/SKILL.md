@@ -54,6 +54,10 @@ does not cover router selection or installer lifecycle; use
   the staging tree and published only after the bundle passes layout
   and proxy-policy validation. `browser/data/user.js` sets
   `intl.locale.requested`.
+- `.i2pd-browser-build.json` records schema 1, UTC time/epoch, platform, locale,
+  HTTP proxy, Firefox product/version/final URL/SHA-512, and NoScript
+  version/SHA-512. Launchers warn locally after 30 days or on unknown metadata;
+  they do not query upstream. Floating selectors remain non-reproducible.
 
 ## Procedure
 

@@ -1,6 +1,9 @@
 /browser
 /.browser-build/
 /.browser-old/
+/.browser-build.lock
+/.browser-switch.lock
+/.browser-switch-failed/
 /start-i2pd-browser.desktop
 /i2pd-browser.conf
 /i2pd-browser.log
