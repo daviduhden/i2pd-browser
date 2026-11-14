@@ -128,9 +128,9 @@ checks, and do not browse clearnet to prove a leak.
 ./browser/start-i2pd-browser.bash --help
 ```
 
-`--help` asks the bundled Firefox for help and prints the launcher
-usage; it is a low-impact check that the executable and i18n files are
-present. Starting Firefox normally or starting a router is a separate
+`--help` prints launcher usage without starting Firefox, preparing IBus,
+writing logs, or updating desktop entries. It does not prove that the browser
+executable works. Starting Firefox normally or starting a router is a separate
 action; record it only if actually performed. There is no automated
 post-build smoke test in this repository.
 

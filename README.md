@@ -305,7 +305,9 @@ On Windows the router is started as a hidden background process and a
 PID file is used instead of `screen`. The Firefox bundle is built with
 `build/build.ps1` or the `build\build.cmd` shim, for example
 `build\build.cmd --language=en-US`, and launched with
-`build/scripts/start-i2pd-browser.ps1`.
+`browser/start-i2pd-browser.cmd` or `browser/start-i2pd-browser.ps1`
+from the generated bundle. The files under `build/scripts/` are source templates,
+not runnable browser installations.
 
 The installer does not add Windows Defender exclusions. If Defender flags a
 download, investigate the detection and verify the release before proceeding.

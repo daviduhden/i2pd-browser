@@ -290,7 +290,7 @@ function Show-Summary {
     Get-I18nMessage 'status.socks-proxy' @(Get-RouterSocksProxy) | Write-Host
     Get-I18nMessage 'status.console' @(Get-RouterConsoleUrl) | Write-Host
     Write-Host ''
-    Write-Host 'Run start-i2pd-browser.ps1 to launch Firefox.'
+    Get-I18nMessage 'launcher.run' @('browser/start-i2pd-browser.ps1') | Write-Host
 }
 
 function Invoke-Install {

@@ -138,6 +138,9 @@ Do not send traffic to a clearnet test site. Use the existing
 - **Outproxy distinction.** Clearnet access through an I2P outproxy is
   an intentional I2P feature; direct clearnet access is the leak to
   prevent. Do not conflate them.
+- **Desktop commands.** Use the desktop serializer, not `bash -c` with an
+  interpolated path. Desktop escaping, shell quoting and sed replacement
+  escaping are distinct layers. `--help` must not modify the installation.
 - **Version-dependent policies.** `AIControls`, `LocalNetworkAccess`,
   `BrowserDataBackup`, `IPProtectionAvailable`, `VisualSearchEnabled`,
   and `XSLTEnabled` may be ignored by older ESR builds. A newer ESR

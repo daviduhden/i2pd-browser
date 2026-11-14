@@ -24,6 +24,8 @@ i18n_init
 source "$I2PD_BROWSER_ROOT/lib/router.bash"
 # shellcheck disable=SC1091
 source "$I2PD_BROWSER_ROOT/lib/browser-policy.bash"
+# shellcheck disable=SC1091
+source "$I2PD_BROWSER_ROOT/build/scripts/desktop-entry.bash"
 
 # With errtrace enabled, report failures from nested functions as well as main.
 trap 'error "Unhandled error at line $LINENO."' ERR
@@ -363,7 +365,6 @@ copy_launch_scripts() {
 	cp ../lib/i18n.bash "$staging_dir/"
 	cp ../lib/i18n.ps1 "$staging_dir/"
 	cp -r ../locales "$staging_dir/"
-	cp scripts/start-i2pd-browser.desktop ../
 }
 
 publish_browser() {
@@ -401,6 +402,7 @@ main() {
 	write_locale_preference
 	validate_bundle
 	publish_browser
+	browser_desktop_entry scripts/start-i2pd-browser.desktop ../start-i2pd-browser.desktop "$I2PD_BROWSER_ROOT/browser/start-i2pd-browser.bash"
 	log "$(i18n_message info.build.complete)"
 }
 

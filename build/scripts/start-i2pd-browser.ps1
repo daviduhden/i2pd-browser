@@ -70,6 +70,32 @@ function Import-BrowserArgs {
     return $remaining
 }
 
+function ConvertTo-WindowsArgument {
+    param([AllowEmptyString()][string]$Value)
+    $result = '"'
+    $slashes = 0
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq [char]92) { $slashes++; continue }
+        if ($character -eq [char]34) {
+            $result += ('\' * (2 * $slashes + 1)) + '"'
+        } else { $result += ('\' * $slashes) + $character }
+        $slashes = 0
+    }
+    return $result + ('\' * (2 * $slashes)) + '"'
+}
+
+function Show-BundleAge {
+    $metadata = Join-Path $script:BrowserDir '.i2pd-browser-build.json'
+    try {
+        $manifest = Get-Content -LiteralPath $metadata -Raw | ConvertFrom-Json
+        $epoch = [long]$manifest.built_epoch
+        if ($manifest.schema -ne 1 -or $epoch -le 0) { throw 'Invalid metadata' }
+        if ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - $epoch -gt 30 * 86400) {
+            Write-Warning (Get-I18nMessage 'warning.bundle-age' @(30))
+        }
+    } catch { Write-Warning (Get-I18nMessage 'error.bundle-metadata') }
+}
+
 function Start-Firefox {
     param([string[]]$FirefoxArgs)
     if (-not (Test-Path $script:Firefox)) {
@@ -89,16 +115,12 @@ function Start-Firefox {
         $script:LogFile = Join-Path $script:LogFile 'i2pd-browser.log'
     }
 
-    if ($script:ShowUsage) {
-        & $script:Firefox -profile $profileDir --help
-        Show-BrowserUsage
-        return
-    }
 
     if ($script:Detach) {
         # Start-Process joins its argument array with spaces without
         # adding quotes, so quote a profile path that contains spaces.
-        $startArguments = @('-profile', "`"$profileDir`"") + $FirefoxArgs
+        $startArguments = @('-profile', $profileDir) + $FirefoxArgs
+        $startArguments = ($startArguments | ForEach-Object { ConvertTo-WindowsArgument $_ }) -join ' '
         Start-Process -FilePath $script:Firefox `
             -ArgumentList $startArguments `
             -WorkingDirectory $script:BrowserDir | Out-Null
@@ -120,4 +142,14 @@ function Start-Firefox {
 }
 
 $browserArgs = Import-BrowserArgs -Arguments $args
+if ($script:ShowUsage) { Show-BrowserUsage; exit 0 }
+foreach ($lockName in @('.browser-build.lock', '.browser-switch.lock')) {
+    $operationLock = Join-Path $script:BrowserDir ('../' + $lockName)
+    if (Get-Item -LiteralPath $operationLock -Force -ErrorAction SilentlyContinue) {
+        Write-Error (Get-I18nMessage 'error.build-locked' @($operationLock)); exit 1
+    }
+}
+Show-BundleAge
 Start-Firefox -FirefoxArgs $browserArgs
+if ($script:Detach) { exit 0 }
+exit $LASTEXITCODE

@@ -3,7 +3,8 @@
 # See the LICENSE file at the top of the project tree for copyright and license
 # details.
 
-# This file is a self-modifying .desktop file that can be run from the shell.
+# The builder and launcher generate an absolute, escaped Exec entry.
+# The tracked template cannot be launched directly from a desktop GUI.
 # It preserves arguments and environment for the start-i2pd-browser.bash
 # script.
 #
@@ -32,7 +33,7 @@ Name=I2Pd Browser Setup
 GenericName=I2Pd Browser
 Comment=I2Pd Browser for surfing I2P sites
 Categories=Network;WebBrowser;Security;
-Exec=bash -c '"$(dirname "$*")"/browser/start-i2pd-browser.bash --detach || ([ ! -x "$(dirname "$*")"/browser/start-i2pd-browser.bash ] && "$(dirname "$*")"/start-i2pd-browser.bash --detach)' dummy %k
+Exec=false
 X-I2PdBrowser-ExecShell=./browser/start-i2pd-browser.bash --detach
 Icon=web-browser
 StartupWMClass=I2Pd Browser

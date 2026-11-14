@@ -10,11 +10,14 @@
 
 set -Eeuo pipefail
 
-_launcher_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+_launcher_path="$(readlink -f "${BASH_SOURCE[0]}")"
+_launcher_dir="$(dirname "$_launcher_path")"
 # shellcheck disable=SC2034
 I2PD_BROWSER_ROOT="$_launcher_dir"
 # shellcheck disable=SC1091
 source "$_launcher_dir/i18n.bash"
+# shellcheck disable=SC1091
+source "$_launcher_dir/desktop-entry.bash"
 _launcher_locale="$(cat "$_launcher_dir/.i2pd-browser-locale" 2>/dev/null ||
 	printf 'en-US')"
 i18n_init "$_launcher_locale" || i18n_init en-US
@@ -243,53 +246,35 @@ setup_ibus_workaround() {
 }
 
 update_desktop_launcher() {
-	local exec_line escaped
-
-	# The parent directory holds the relocatable .desktop copy. If it
-	# is not writable the browser can still be launched, so skip the
-	# refresh instead of aborting.
 	[[ -w .. ]] || return 0
-
-	cp start-i2pd-browser.desktop ../
-	exec_line="Exec=bash -c '\"$PWD/start-i2pd-browser.bash\" --detach"
-	exec_line+=" || ([ ! -x \"$PWD/start-i2pd-browser.bash\" ]"
-	# shellcheck disable=SC2016
-	exec_line+=' && "$(dirname "$*")"/browser/start-i2pd-browser.bash'
-	exec_line+=" --detach)' dummy %k"
-	# Escape the characters that are special in a sed replacement
-	# (&, backslash and the chosen delimiter) so the literal command
-	# is inserted instead of the matched text.
-	escaped="${exec_line//\\/\\\\}"
-	escaped="${escaped//&/\\&}"
-	escaped="${escaped//,/\\,}"
-	sed -i -e "s,^Exec=.*,$escaped," ../start-i2pd-browser.desktop
+	browser_desktop_entry start-i2pd-browser.desktop ../start-i2pd-browser.desktop "$PWD/start-i2pd-browser.bash"
 }
 
 handle_app_registration() {
 	if [[ $register_desktop_app -eq 1 ]]; then
-		mkdir -p "$HOME/.local/share/i2pd-browser/"
+		mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/applications/"
 		cp ../start-i2pd-browser.desktop \
-			"$HOME/.local/share/i2pd-browser/"
+			"${XDG_DATA_HOME:-$HOME/.local/share}/applications/"
 		update-desktop-database \
-			"$HOME/.local/share/i2pd-browser/" || true
+			"${XDG_DATA_HOME:-$HOME/.local/share}/applications/" || true
 		log "Desktop entry registered at" \
-			" ~/.local/share/i2pd-browser/"
+			" ${XDG_DATA_HOME:-$HOME/.local/share}/applications/"
 		exit 0
 	fi
 
 	if [[ $register_desktop_app -eq -1 ]]; then
 		local desktop_path
-		desktop_path="$HOME/.local/share/i2pd-browser"
+		desktop_path="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 		desktop_path+="/start-i2pd-browser.desktop"
 		if [[ -e $desktop_path ]]; then
 			rm -f "$desktop_path"
 			update-desktop-database \
-				"$HOME/.local/share/i2pd-browser/" || true
+				"${XDG_DATA_HOME:-$HOME/.local/share}/applications/" || true
 			log "Desktop entry removed from" \
-				" ~/.local/share/i2pd-browser/"
+				" ${XDG_DATA_HOME:-$HOME/.local/share}/applications/"
 		else
 			warn "Desktop entry not found in" \
-				" ~/.local/share/i2pd-browser/"
+				" ${XDG_DATA_HOME:-$HOME/.local/share}/applications/"
 		fi
 		exit 0
 	fi
@@ -367,9 +352,34 @@ run_browser() {
 		>"$logfile" 2>&1 </dev/null
 }
 
+warn_bundle_age() {
+	local metadata="$I2PD_BROWSER_ROOT/.i2pd-browser-build.json" built now
+	if command -v jq >/dev/null 2>&1 &&
+		built="$(jq -er '.built_epoch | select(type == "number" and . > 0 and floor == .)' "$metadata" 2>/dev/null)"; then
+		now="$(date +%s)"
+		if ((now - built > 30 * 86400)); then
+			warn "$(i18n_message warning.bundle-age 30)"
+		fi
+	else
+		warn "$(i18n_message error.bundle-metadata)"
+	fi
+}
+
 main() {
-	check_runtime
 	parse_args "$@"
+	if [[ $show_usage -eq 1 ]]; then
+		browser_usage
+		return 0
+	fi
+	check_runtime
+	local operation_lock
+	for operation_lock in "$I2PD_BROWSER_ROOT/../.browser-build.lock" "$I2PD_BROWSER_ROOT/../.browser-switch.lock"; do
+		if [[ -e $operation_lock || -L $operation_lock ]]; then
+			complain "$(i18n_message error.build-locked "$operation_lock")"
+			return 1
+		fi
+	done
+	warn_bundle_age
 	configure_output
 	resolve_script_path
 	setup_shell_env

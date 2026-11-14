@@ -334,7 +334,7 @@ print_summary() {
 	router_t status.socks-proxy "$(router_socks_proxy)"
 	router_t status.console "$(router_console_url)"
 	printf '\n'
-	printf 'Run ./start-i2pd-browser.desktop to launch Firefox.\n'
+	router_t launcher.run ./start-i2pd-browser.desktop
 }
 
 cmd_install() {
