@@ -48,6 +48,14 @@ commands. Use `firefox-esr-bundling` for Firefox-specific work.
   runs its interactive console installer, and has no checksum or
   signature verification. Do not claim otherwise.
 
+## PowerShell backend scope
+
+`Import-RouterBackend` imports a backend from inside a function. Backend API
+functions must be declared with `script:` scope so they survive that import
+function returning. Keep backend state at script scope too, and initialize optional
+root/state variables safely under StrictMode. Merely parsing a dot-sourced file
+does not verify that its lifecycle API remains available after import.
+
 ## Procedure
 
 1. Read both language versions of the abstraction and the affected

@@ -15,7 +15,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not $script:I2PD_BROWSER_ROOT) {
+$rootVariable = Get-Variable -Name I2PD_BROWSER_ROOT -Scope Script -ErrorAction SilentlyContinue
+if (-not $rootVariable -or -not $rootVariable.Value) {
     $script:I2PD_BROWSER_ROOT = (
         Resolve-Path (Join-Path $PSScriptRoot '..')
     ).Path

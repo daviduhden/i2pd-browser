@@ -13,23 +13,23 @@ $script:BACKEND_DIR = Join-Path $script:I2PD_BROWSER_ROOT 'i2pd'
 $script:BACKEND_CONSOLE_PORT = '7070'
 $script:BACKEND_PID_FILE = Join-Path $script:BACKEND_DIR '.router.pid'
 
-function Get-I2pdVendorDir { return (Join-Path (Get-RouterVendorDir) 'i2pd') }
+function script:Get-I2pdVendorDir { return (Join-Path (Get-RouterVendorDir) 'i2pd') }
 
-function Get-I2pdVendorBin {
+function script:Get-I2pdVendorBin {
     return (Join-Path (Get-I2pdVendorDir) 'i2pd.exe')
 }
 
-function Get-I2pdVendorVersion {
+function script:Get-I2pdVendorVersion {
     $file = Join-Path (Get-I2pdVendorDir) 'VERSION'
     if (Test-Path $file) { return (Get-Content $file -Raw).Trim() }
     return ''
 }
 
-function Get-I2pdVendorIsInstalled {
+function script:Get-I2pdVendorIsInstalled {
     return (Test-Path (Get-I2pdVendorBin))
 }
 
-function Get-I2pdSystemPath {
+function script:Get-I2pdSystemPath {
     $command = Get-Command 'i2pd' -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
 
@@ -48,7 +48,7 @@ function Get-I2pdSystemPath {
     return $null
 }
 
-function Get-I2pdPath {
+function script:Get-I2pdPath {
     if ((Get-RouterSource) -eq 'vendored') {
         if (Get-I2pdVendorIsInstalled) { return (Get-I2pdVendorBin) }
         return $null
@@ -56,13 +56,13 @@ function Get-I2pdPath {
     return (Get-I2pdSystemPath)
 }
 
-function Get-BackendIsInstalled {
+function script:Get-BackendIsInstalled {
     return [bool](Get-I2pdPath)
 }
 
-function Get-BackendIsMisconfigured { return $false }
+function script:Get-BackendIsMisconfigured { return $false }
 
-function Get-BackendIsRunning {
+function script:Get-BackendIsRunning {
     if (Test-Path $script:BACKEND_PID_FILE) {
         $pidValue = (Get-Content $script:BACKEND_PID_FILE -Raw).Trim()
         if ($pidValue) {
@@ -73,18 +73,18 @@ function Get-BackendIsRunning {
     return [bool](Get-Process -Name 'i2pd' -ErrorAction SilentlyContinue)
 }
 
-function Get-BackendIsManaged {
+function script:Get-BackendIsManaged {
     if (-not (Test-Path $script:BACKEND_PID_FILE)) { return $false }
     $pidValue = (Get-Content $script:BACKEND_PID_FILE -Raw).Trim()
     if (-not $pidValue) { return $false }
     return [bool](Get-Process -Id ([int]$pidValue) -ErrorAction SilentlyContinue)
 }
 
-function Get-BackendConsoleUrl {
+function script:Get-BackendConsoleUrl {
     return "http://127.0.0.1:$script:BACKEND_CONSOLE_PORT/"
 }
 
-function Test-I2pdDefenderExcluded {
+function script:Test-I2pdDefenderExcluded {
     param([string[]]$Path)
     try {
         $preference = Get-MpPreference -ErrorAction Stop
@@ -103,7 +103,7 @@ function Test-I2pdDefenderExcluded {
     }
 }
 
-function Add-I2pdDefenderExclusion {
+function script:Add-I2pdDefenderExclusion {
     # Windows Defender has repeatedly flagged i2pd builds as malware
     # (false positive). Adding exclusions requires administrator rights,
     # so this is best effort and never fatal.
@@ -128,7 +128,7 @@ function Add-I2pdDefenderExclusion {
     }
 }
 
-function Initialize-BackendConfig {
+function script:Initialize-BackendConfig {
     $conf = Join-Path $script:BACKEND_DIR 'i2pd.conf'
     if (-not (Test-Path $conf)) {
         Write-RouterError "i2pd configuration not found: $conf"
@@ -143,7 +143,7 @@ function Initialize-BackendConfig {
     return $true
 }
 
-function Get-BackendDependencyHint {
+function script:Get-BackendDependencyHint {
     return @'
 i2pd (C++) was not found.
 Install it with winget:
@@ -154,7 +154,7 @@ See https://i2pd.readthedocs.io for details.
 '@
 }
 
-function Install-BackendDependencies {
+function script:Install-BackendDependencies {
     if (Test-RouterCommand 'winget') {
         & winget install --id PurpleI2P.i2pd --accept-source-agreements `
             --accept-package-agreements
@@ -164,7 +164,7 @@ function Install-BackendDependencies {
     return $false
 }
 
-function Get-I2pdVendorAssetName {
+function script:Get-I2pdVendorAssetName {
     param([string]$Version)
     switch (Get-RouterArch) {
         'x86_64' { return "i2pd_${Version}_win64_mingw.zip" }
@@ -175,7 +175,7 @@ function Get-I2pdVendorAssetName {
 
 # Validate the release asset against its SHA-512 manifest before extracting
 # it into the managed vendor directory.
-function Install-BackendVendor {
+function script:Install-BackendVendor {
     $version = Get-RouterLatestGithubRelease -Repo 'PurpleI2P/i2pd'
     if (-not $version) { return $false }
 
@@ -246,7 +246,7 @@ function Install-BackendVendor {
 
 # Start with the tracked i2pd configuration directory as the router data root;
 # relative configuration paths and runtime state are resolved from this folder.
-function Start-Backend {
+function script:Start-Backend {
     $binary = Get-I2pdPath
     if (-not $binary) {
         Write-RouterError 'i2pd was not found.'
@@ -274,7 +274,7 @@ function Start-Backend {
     return $true
 }
 
-function Stop-Backend {
+function script:Stop-Backend {
     if (-not (Test-Path $script:BACKEND_PID_FILE)) {
         Write-RouterWarn 'No managed i2pd PID file was found.'
         return $false

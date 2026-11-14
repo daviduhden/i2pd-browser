@@ -18,21 +18,21 @@ $script:BACKEND_DATA_DIR = Join-Path $script:BACKEND_DIR 'data'
 $script:BACKEND_CONSOLE_PORT = '7657'
 $script:BACKEND_PID_FILE = Join-Path $script:BACKEND_DIR '.router.pid'
 
-function Get-I2pJavaVendorDir {
+function script:Get-I2pJavaVendorDir {
     return (Join-Path (Get-RouterVendorDir) 'i2p-java')
 }
 
-function Get-I2pJavaVendorHome {
+function script:Get-I2pJavaVendorHome {
     return (Join-Path (Get-I2pJavaVendorDir) 'i2p')
 }
 
-function Get-I2pJavaVendorVersion {
+function script:Get-I2pJavaVendorVersion {
     $file = Join-Path (Get-I2pJavaVendorDir) 'VERSION'
     if (Test-Path $file) { return (Get-Content $file -Raw).Trim() }
     return ''
 }
 
-function Test-I2pJavaIsHome {
+function script:Test-I2pJavaIsHome {
     param([string]$Path)
     if (-not $Path) { return $false }
     $lib = Join-Path $Path 'lib'
@@ -41,11 +41,11 @@ function Test-I2pJavaIsHome {
             -ErrorAction SilentlyContinue | Select-Object -First 1)
 }
 
-function Get-I2pJavaVendorIsInstalled {
+function script:Get-I2pJavaVendorIsInstalled {
     return (Test-I2pJavaIsHome (Get-I2pJavaVendorHome))
 }
 
-function Get-I2pJavaSystemHome {
+function script:Get-I2pJavaSystemHome {
     $candidates = @(
         (Join-Path $env:LOCALAPPDATA 'I2P')
         (Join-Path $env:APPDATA 'I2P')
@@ -67,7 +67,7 @@ function Get-I2pJavaSystemHome {
     return $null
 }
 
-function Get-I2pJavaHome {
+function script:Get-I2pJavaHome {
     if ((Get-RouterSource) -eq 'vendored') {
         if (Get-I2pJavaVendorIsInstalled) { return (Get-I2pJavaVendorHome) }
         return $null
@@ -75,7 +75,7 @@ function Get-I2pJavaHome {
     return (Get-I2pJavaSystemHome)
 }
 
-function Get-I2pJavaExecutable {
+function script:Get-I2pJavaExecutable {
     if ($env:JAVA_HOME) {
         $candidate = Join-Path $env:JAVA_HOME 'bin\java.exe'
         if (Test-Path $candidate) { return $candidate }
@@ -85,16 +85,16 @@ function Get-I2pJavaExecutable {
     return $null
 }
 
-function Get-BackendIsInstalled {
+function script:Get-BackendIsInstalled {
     return [bool](Get-I2pJavaHome)
 }
 
-function Get-BackendIsMisconfigured {
+function script:Get-BackendIsMisconfigured {
     if (-not (Get-I2pJavaHome)) { return $false }
     return (-not (Get-I2pJavaExecutable))
 }
 
-function Get-I2pJavaProcess {
+function script:Get-I2pJavaProcess {
     $pidFile = $script:BACKEND_PID_FILE
     if (Test-Path $pidFile) {
         $pidValue = (Get-Content $pidFile -Raw).Trim()
@@ -117,22 +117,22 @@ function Get-I2pJavaProcess {
     return $null
 }
 
-function Get-BackendIsRunning {
+function script:Get-BackendIsRunning {
     return [bool](Get-I2pJavaProcess)
 }
 
-function Get-BackendIsManaged {
+function script:Get-BackendIsManaged {
     if (-not (Test-Path $script:BACKEND_PID_FILE)) { return $false }
     $pidValue = (Get-Content $script:BACKEND_PID_FILE -Raw).Trim()
     if (-not $pidValue) { return $false }
     return [bool](Get-Process -Id ([int]$pidValue) -ErrorAction SilentlyContinue)
 }
 
-function Get-BackendConsoleUrl {
+function script:Get-BackendConsoleUrl {
     return "http://127.0.0.1:$script:BACKEND_CONSOLE_PORT/"
 }
 
-function Get-BackendDependencyHint {
+function script:Get-BackendDependencyHint {
     return @'
 I2P (Java) was not found, or no Java runtime is available.
 Install a Java runtime and the I2P router with winget:
@@ -143,7 +143,7 @@ Or let I2Pd Browser download the latest stable release from i2p.net:
 '@
 }
 
-function Install-BackendDependencies {
+function script:Install-BackendDependencies {
     if (Test-RouterCommand 'winget') {
         & winget install --id Microsoft.OpenJDK.21 `
             --accept-source-agreements --accept-package-agreements
@@ -157,7 +157,7 @@ function Install-BackendDependencies {
     return $false
 }
 
-function Set-I2pJavaConfigValue {
+function script:Set-I2pJavaConfigValue {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$Key,
@@ -184,7 +184,7 @@ function Set-I2pJavaConfigValue {
     return $true
 }
 
-function Set-I2pJavaProxyOverrides {
+function script:Set-I2pJavaProxyOverrides {
     $tunnels = Join-Path $script:BACKEND_DATA_DIR 'i2ptunnel.config'
     if ($script:ROUTER_HTTP_PROXY_HOST_OVERRIDE -or
         $script:ROUTER_HTTP_PROXY_PORT_OVERRIDE) {
@@ -221,7 +221,7 @@ function Set-I2pJavaProxyOverrides {
 
 # Seed only missing files: this is both the initial configuration copy and
 # the preservation boundary for existing effective settings and router state.
-function Initialize-BackendConfig {
+function script:Initialize-BackendConfig {
     $src = $script:BACKEND_CONFIG_DIR
     $dst = $script:BACKEND_DATA_DIR
 
@@ -249,7 +249,7 @@ function Initialize-BackendConfig {
     return $true
 }
 
-function Get-I2pJavaLatestVersion {
+function script:Get-I2pJavaLatestVersion {
     try {
         $page = Invoke-WebRequest -Uri 'https://i2p.net/en/downloads/' `
             -UseBasicParsing
@@ -267,12 +267,12 @@ function Get-I2pJavaLatestVersion {
     return ($versions | Sort-Object { [version]$_ } | Select-Object -Last 1)
 }
 
-function Get-I2pJavaInstallerUrl {
+function script:Get-I2pJavaInstallerUrl {
     param([string]$Version)
     return "https://files.i2p.net/$Version/i2pinstall_$Version.jar"
 }
 
-function Install-BackendVendor {
+function script:Install-BackendVendor {
     $version = Get-I2pJavaLatestVersion
     if (-not $version) {
         Write-RouterError 'Could not determine the latest I2P release.'
@@ -325,7 +325,7 @@ function Install-BackendVendor {
     return $true
 }
 
-function Get-BackendClasspath {
+function script:Get-BackendClasspath {
     param([string]$Home)
     $jars = Get-ChildItem -Path (Join-Path $Home 'lib') -Filter '*.jar'
     return (($jars | ForEach-Object { $_.FullName }) -join ';')
@@ -333,7 +333,7 @@ function Get-BackendClasspath {
 
 # Pass an absolute isolated config path to Java so the router does not use
 # the launching user's global configuration directory.
-function Start-Backend {
+function script:Start-Backend {
     $home = Get-I2pJavaHome
     if (-not $home) {
         Write-RouterError 'I2P (Java) installation not found.'
@@ -378,7 +378,7 @@ function Start-Backend {
     return $true
 }
 
-function Stop-Backend {
+function script:Stop-Backend {
     if (-not (Test-Path $script:BACKEND_PID_FILE)) {
         Write-RouterWarn 'No managed I2P (Java) PID file was found.'
         return $false
