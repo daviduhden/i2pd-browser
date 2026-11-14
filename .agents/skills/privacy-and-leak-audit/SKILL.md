@@ -22,6 +22,9 @@ test.
 - `network.proxy.type` is `1`, and
   `network.proxy.failover_direct` is locked to `false`. A proxy failure
   must stop navigation, not fall back to direct access.
+- WebRTC is disabled with `lockPref("media.peerconnection.enabled", false)`;
+  retaining a user profile must not re-enable this network capability. This
+  static control is not a substitute for an isolated ICE/STUN traffic test.
 - DoH is disabled and locked. Captive-portal and connectivity probes
   are locked off. The expected HTTPS-only mode is intentionally
   disabled so `.i2p` HTTP sites work; do not "fix" that by enabling
