@@ -200,8 +200,8 @@ that could be mistaken for active configuration.
 | `install.bash`, `install.ps1` | Parse commands/options, select language/backend/source, prepare configuration, optionally build Firefox, and dispatch router lifecycle commands. The Bash and PowerShell paths should remain behaviorally aligned. |
 | `install.cmd` | Windows shim. Prefers `pwsh.exe`, falls back to `powershell.exe`, passes `%*`, and returns the PowerShell exit code. |
 | `lib/router.bash`, `lib/router.ps1` | Shared backend selection, config persistence, managed download/checksum helpers, proxy defaults, state and lifecycle abstraction. |
-| `lib/backends/i2pd.bash`, `lib/backends/i2pd.ps1` | Discover/system-install i2pd or use `vendor/i2pd`, configure Defender exclusion best-effort on Windows, and start/stop the C++ router. |
-| `lib/backends/i2p-java.bash`, `lib/backends/i2p-java.ps1` | Discover Java and a system I2P installation or use `vendor/i2p-java`; seed isolated config; invoke the Java router. The Java vendor installer path lacks checksum verification, unlike vendored i2pd. |
+| `lib/backends/i2pd.bash`, `lib/backends/i2pd.ps1` | Discover/system-install i2pd or use `vendor/i2pd`, validate local listeners and process ownership, and start/stop the C++ router. No Defender exclusions are added. |
+| `lib/backends/i2p-java.bash`, `lib/backends/i2p-java.ps1` | Discover Java and a system I2P installation or use `vendor/i2p-java`; seed isolated config; invoke the Java router. The Java vendor installer requires an independently trusted `I2P_INSTALLER_SHA512` before executing the interactive installer. |
 | `i2pd/i2pd.bash`, `i2pd/i2pd.ps1` | Thin backend-specific launchers that load the shared library, prepare config, then start the selected i2pd backend. |
 | `i2p-java/i2p-java.bash`, `i2p-java/i2p-java.ps1` | Equivalent launchers for I2P (Java), which uses the isolated `data/` configuration. |
 | `*.cmd` shims | Launch sibling PowerShell files with a per-invocation execution policy bypass. They are CRLF-sensitive and must preserve quoting, argument forwarding, and exit status. |
@@ -231,3 +231,29 @@ certificate/address-book records are not suitable targets for inline comments.
 The exact semantics of every Firefox preference and every third-party router
 property vary by upstream version; consult the relevant upstream documentation
 before changing one, and do not infer runtime enforcement from a valid file.
+
+## Safety and maintenance inputs
+
+- `lib/browser-policy.bash` and `lib/browser-policy.ps1` generate and validate the
+  browser policy in production and in offline regression suites. Validation
+  includes the selected endpoint, locked manual proxy, empty bypass, DNS, DoH,
+  telemetry, and update controls. Do not duplicate the generation algorithm
+  inside a test.
+- `build/scripts/desktop-entry.bash` serializes the Desktop Entry `Exec` field
+  without evaluating the installation path as shell code. A source template is
+  not an installed entry; the build and launcher generate an absolute command.
+- `.browser-build.lock` and `.browser-switch.lock` are ignored coordination state. Builds reject concurrent
+  operations and live/ambiguous profile locks. An existing `.browser-old` is
+  recovery evidence, not disposable output for a subsequent build to erase.
+- `browser/.i2pd-browser-build.json` is generated metadata: schema version, UTC
+  build time/epoch, platform, locale, proxy, Firefox version/product/source/hash,
+  and NoScript requested URL/version/hash. Launchers use local timestamps for maintenance
+  reminders, without querying remote services.
+- Router ownership records are runtime state. A PID or session name alone is
+  insufficient; the saved identity must match this installation before stop.
+- Effective Java configuration is validated before startup, including after
+  explicit endpoint changes. No override may be persisted before validation.
+
+See [security and maintenance](security-and-maintenance.md) for verification
+boundaries, branch/platform compatibility, update cadence, recovery, and the
+remaining need for runtime network, accessibility, and performance evidence.

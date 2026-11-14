@@ -175,8 +175,21 @@ change. Use a disposable clone or a backed-up profile.
 - **Plugin/extension assumptions.** NoScript is sideloaded at
   application level, not enforced by an `ExtensionSettings` policy.
 
+## Safe maintenance and launch generation
+
+Do not delete a profile lock to make a rebuild pass. Investigate whether Firefox
+uses it, and never start Firefox during publication. The Linux build now requires
+`unzip` and version-aware `sort`. Keep every new required file in both layout
+validators, including the executable, extension, metadata and desktop helper.
+
 Use `lib/browser-policy.*` for policy generation and validation in builders and
-regression tests. Do not repeat its jq transformation inside tests.
+regression tests. Do not repeat its jq transformation inside tests. Generate
+desktop `Exec` through `build/scripts/desktop-entry.bash`; never insert paths
+into shell code. The source template intentionally cannot launch until an
+absolute entry is generated after publication.
+
+See `docs/security-and-maintenance.md` for the update procedure and branch
+compatibility. An ESR selector is not evidence of maintained 32-bit support.
 
 ## References
 

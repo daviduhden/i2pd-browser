@@ -27,3 +27,22 @@ knowledge update is semantically relevant. Review that relevance manually.
 There is no local hook; contributors can run the script directly, and CI is the
 automated enforcement point. Agent/skill changes require one complete review of
 the instruction system; repeat it only when the review finds a defect to fix.
+
+## Validation and development environment
+
+Use Bash, ShellCheck, shfmt, jq, Git, and Perl 5.14+ for the documented Linux
+checks. Browser builds additionally need curl, tar and its compression support,
+SHA-512 tools, and unzip; router operation requires screen and the selected
+router/runtime. `tests/test-noscript.bash` additionally uses Python 3
+standard-library ZIP fixtures; Python is not a browser build/runtime dependency. On Windows check both PowerShell 5.1 and 7 when available.
+Do not install packages or build a browser merely to review documentation.
+
+Follow [AGENTS.md](AGENTS.md) for the commands applicable to each changed path.
+The i18n, proxy, and validator contract suites create temporary files; they are
+behavioral tests, not static analysis. If a request permits only static checks,
+do not execute them and report that limitation explicitly. A parsed script or
+valid JSON is not evidence of a successful build or runtime privacy test.
+
+See [security and maintenance](docs/security-and-maintenance.md) for download
+trust boundaries, compatibility, recovery, accessibility, and performance
+validation requirements.

@@ -134,6 +134,15 @@ executable works. Starting Firefox normally or starting a router is a separate
 action; record it only if actually performed. There is no automated
 post-build smoke test in this repository.
 
+## Static-only tasks
+
+When the user authorizes only static analysis, write and inspect regression
+tests but do not execute them: the suites create temporary files and exercise
+production functions. Run syntax, lint, format-diff, JSON and workflow checks
+instead; the read-only knowledge validator is also available. Report every
+behavioral suite, real build and runtime check as not run. Never label test
+authoring as passing tests.
+
 ## Evidence rules
 
 - State the exact commands, host platform, and whether `pwsh` was
@@ -176,7 +185,7 @@ post-build smoke test in this repository.
 - `build/build.bash`, `build/build.ps1` - build pipelines.
 - `build/preferences/**` - prefs, policies, autoconfig.
 - `build/scripts/**` - launchers.
-- `tests/test-i18n.bash`, `tests/test-i18n.ps1` - only tracked tests.
+- `tests/` - i18n, proxy-policy, router/build safety and validator contract suites.
 - `README.md` - user-facing build and troubleshooting notes.
 - `docs/configuration-and-source-map.md` - tracked config inputs and generated bundle outputs.
 - Related skills: `firefox-esr-bundling`, `privacy-and-leak-audit`,

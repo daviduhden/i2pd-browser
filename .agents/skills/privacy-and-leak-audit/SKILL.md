@@ -149,8 +149,9 @@ Do not send traffic to a clearnet test site. Use the existing
   installation requires an independently trusted supplied SHA-512.
 - **Version-dependent policies.** `AIControls`, `LocalNetworkAccess`,
   `BrowserDataBackup`, `IPProtectionAvailable`, `VisualSearchEnabled`,
-  and `XSLTEnabled` may be ignored by older ESR builds. A newer ESR
-  target may therefore be less restrictive than the source suggests.
+  and `XSLTEnabled` may be ignored by older ESR builds. An older ESR
+  target may therefore enforce fewer controls than the source suggests.
+  Check the current official reference and effective `about:policies` output.
 - **Launcher profile.** A relative `-profile data` can create a new
   profile in the caller's directory. The Windows launcher now uses an
   absolute path; keep it absolute.

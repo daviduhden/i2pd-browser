@@ -6,8 +6,10 @@ Any contribution is highly appreciated.
 
 On Linux, Mozilla no longer publishes 32-bit (i686) Firefox ESR builds
 in the current branch, so the default product cannot be resolved there.
-Use `ESR_PRODUCT=firefox-esr-latest` to build for 32-bit Linux (32-bit
-Windows is still published in the current branch).
+Mozilla does not provide updates beyond ESR 140 for 32-bit Linux. A legacy
+`ESR_PRODUCT=firefox-esr-latest` selector is not a guarantee of a maintained
+32-bit release; check upstream support before use. Prefer a supported 64-bit
+platform. See [compatibility and maintenance](docs/security-and-maintenance.md).
 
 The I2Pd Browser is a pre-configured version of Firefox ESR for use on
 the I2P network. It works against a generic "I2P router" abstraction,
@@ -426,3 +428,28 @@ The routers downloaded or used by these scripts keep their own terms:
 
 The Firefox ESR bundle and the NoScript extension downloaded by the
 builder are subject to their own terms and conditions.
+
+## Security maintenance and validation
+
+Automatic Firefox updates remain disabled. Rebuild explicitly to receive
+security updates, after closing every Firefox instance using the portable
+profile. Build locks and profile checks refuse unsafe concurrent operations;
+do not delete locks without first investigating their owner. Staging is not a
+substitute for a separate backup of important profile data.
+
+Managed I2P Java installation requires `I2P_INSTALLER_SHA512`, containing the
+trusted SHA-512 digest of the exact installer, obtained independently. The
+installer refuses to execute an unverified JAR. Its console installation is
+interactive and cannot be combined with `--non-interactive`; install the router
+manually first for unattended use. Firefox/i2pd checksums and NoScript structural
+checks are not independent signature authentication. A fixed NoScript artifact
+can be selected with `NOSCRIPT_XPI_URL` (official AMO HTTPS file URL only) and
+a trusted `NOSCRIPT_SHA512`; floating latest remains the default.
+
+See [security, maintenance, and compatibility](docs/security-and-maintenance.md)
+for the update procedure, artifact trust boundaries, platform matrix, recovery,
+accessibility limitations, and performance evaluation. See
+[contributing](CONTRIBUTING.md) for static versus behavioral validation. The
+agent-knowledge workflow is manual-only and can inspect an explicit Git range;
+it is not an automatic pull request check.
+

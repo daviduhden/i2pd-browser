@@ -37,9 +37,9 @@ a system installation or from a project-managed copy under `vendor/`.
 
 ## Supported targets
 
-- Linux build: `x86_64`, `aarch64`, and `i686`. Mozilla no longer
-  publishes current-branch 32-bit Linux ESR, so use
-  `ESR_PRODUCT=firefox-esr-latest` for `i686`.
+- Linux build: `x86_64` and `aarch64`. A legacy `i686` mapping exists, but
+  Mozilla supplies no updates beyond ESR 140 for 32-bit Linux; a redirector
+  selector does not establish maintained support. Check upstream support first.
 - Windows build: `x86_64`, `i386`, and `aarch64`. The vendored i2pd
   option currently provides Windows `x86_64` and `i386` only.
 - Routers: i2pd (C++) and I2P (Java). Both expose the Firefox HTTP proxy
@@ -127,8 +127,10 @@ user state, not source.
 
 - Distinguish static analysis, syntax checks, unit tests, a real build,
   and a runtime smoke test. Do not claim one as another.
-- Run the i18n test for any catalog, locale-selection, installer, or
-  build-message change. Run the PowerShell test when `pwsh` exists.
+- Run the i18n test for catalog, locale-selection, installer, or build-message
+  changes when execution is authorized. For a static-only task, parse and review
+  tests but do not execute them; report behavioral validation as not run.
+  Run PowerShell tests only when execution is authorized and `pwsh` exists.
 - Run `bash -n`, `shellcheck`, and `shfmt -d` after shell changes. Do
   not add a lint dependency the repository does not already assume.
 - Validate JSON with `jq`, and inspect the final diff with
@@ -246,6 +248,10 @@ Every final report must contain **Agent & Skills Synchronization** and state
 agents reviewed, skills reviewed, instruction files updated, reusable knowledge
 added/corrected, validations actually run, and a final `PASS` or `FAIL` status.
 An unavailable check must be reported as not run, never as passed.
+
+See [security and maintenance](docs/security-and-maintenance.md) for download
+trust, bundle manifests, local maintenance warnings, recovery, compatibility,
+accessibility, and performance evidence requirements.
 
 ## Specialized skills
 

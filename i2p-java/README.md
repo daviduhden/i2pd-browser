@@ -31,3 +31,19 @@ global `~/.i2p` configuration.
 
 All vendored files are limited to what I2Pd Browser must control
 explicitly. Values that merely repeat upstream defaults are omitted.
+
+## Verified managed installation
+
+Before downloading a managed installer, set `I2P_INSTALLER_SHA512` to a trusted
+128-character SHA-512 digest for that exact installer. Obtain the digest
+independently; a hash of an unverified download does not establish trust.
+See [download verification](../docs/security-and-maintenance.md) for upstream
+signature verification and its trust requirements. Automatic PGP verification
+is not implemented. The console installer requires an interactive terminal;
+`--non-interactive` cannot provision a new managed Java installation.
+
+Explicit proxy overrides are validated before effective files are changed.
+Related endpoint changes are prepared as a coherent set, with restoration on
+ordinary write failures. Existing effective files remain user state: unsafe or
+ambiguous listener configuration is rejected, not silently reset. A power failure
+may still require recovery from preserved configuration or backup evidence.
