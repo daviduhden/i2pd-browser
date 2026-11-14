@@ -40,9 +40,8 @@ PowerShell. Use `i2p-router-integration` for backend logic and
 - The Bash installer uses `screen` on Linux. The PowerShell backends use
   hidden processes and PID files on Windows. `--install-deps` is the
   only path that installs packages; it may use `sudo` or `winget`.
-- The i2pd Windows backend adds a best-effort Defender exclusion for
-  `i2pd.exe` and its directories. It is not a security control and must
-  never become a fatal requirement.
+- No configuration or vendor-install path adds Defender exclusions. Any
+  exclusion is an explicit administrator decision outside normal installation.
 - Selector prompts go to stderr/terminal; stdout contains only the selected
   identifier because the installer captures it. PowerShell interactive detection
   also rejects redirected stdin.

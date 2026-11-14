@@ -307,11 +307,10 @@ PID file is used instead of `screen`. The Firefox bundle is built with
 `build\build.cmd --language=en-US`, and launched with
 `build/scripts/start-i2pd-browser.ps1`.
 
-Because Windows Defender has repeatedly flagged i2pd builds as malware
-(false positive), the i2pd backend adds a best-effort Defender
-exclusion for `i2pd.exe` and the i2pd directories whenever it prepares
-its configuration. Adding an exclusion requires administrator rights;
-if it is not possible, a warning is printed and nothing else changes.
+The installer does not add Windows Defender exclusions. If Defender flags a
+download, investigate the detection and verify the release before proceeding.
+Do not assume every detection is a false positive. Any administrator-managed
+exclusion is an explicit system security decision outside normal installation.
 
 ## Configuration layout
 

@@ -84,61 +84,12 @@ function script:Get-BackendConsoleUrl {
     return "http://127.0.0.1:$script:BACKEND_CONSOLE_PORT/"
 }
 
-function script:Test-I2pdDefenderExcluded {
-    param([string[]]$Path)
-    try {
-        $preference = Get-MpPreference -ErrorAction Stop
-        if ($preference.ExclusionProcess -notcontains 'i2pd.exe') {
-            return $false
-        }
-        foreach ($item in $Path) {
-            if ($item -and ($preference.ExclusionPath -notcontains $item)) {
-                return $false
-            }
-        }
-        return $true
-    }
-    catch {
-        return $false
-    }
-}
-
-function script:Add-I2pdDefenderExclusion {
-    # Windows Defender has repeatedly flagged i2pd builds as malware
-    # (false positive). Adding exclusions requires administrator rights,
-    # so this is best effort and never fatal.
-    param([string[]]$Path)
-
-    if (-not (Get-Command 'Add-MpPreference' -ErrorAction SilentlyContinue)) {
-        return
-    }
-
-    $paths = @($Path | Where-Object { $_ } | Select-Object -Unique)
-    if (Test-I2pdDefenderExcluded -Path $paths) { return }
-
-    try {
-        Add-MpPreference -ExclusionProcess 'i2pd.exe' -ErrorAction Stop
-        foreach ($item in $paths) {
-            Add-MpPreference -ExclusionPath $item -ErrorAction Stop
-        }
-        Write-RouterLog 'Added a Windows Defender exclusion for i2pd.'
-    }
-    catch {
-        Write-RouterWarn 'Could not add a Windows Defender exclusion for i2pd (administrator rights are required).'
-    }
-}
-
 function script:Initialize-BackendConfig {
     $conf = Join-Path $script:BACKEND_DIR 'i2pd.conf'
     if (-not (Test-Path $conf)) {
         Write-RouterError "i2pd configuration not found: $conf"
         return $false
     }
-
-    $paths = @($script:BACKEND_DIR)
-    $binary = Get-I2pdPath
-    if ($binary) { $paths += (Split-Path -Parent $binary) }
-    Add-I2pdDefenderExclusion -Path $paths
 
     return $true
 }
@@ -192,10 +143,6 @@ function script:Install-BackendVendor {
     $url += "/$version/$asset"
     $dir = Get-I2pdVendorDir
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
-
-    # Exclude the vendor directory before extracting so Defender does
-    # not quarantine the freshly downloaded binary.
-    Add-I2pdDefenderExclusion -Path @($dir)
 
     $tmp = Join-Path ([System.IO.Path]::GetTempPath()) `
         ("i2pd-vendor-" + [System.Guid]::NewGuid().ToString('N'))
