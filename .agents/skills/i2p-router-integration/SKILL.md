@@ -143,9 +143,12 @@ delete its PID file, or remove its data directory.
   Verify executable capability and the target ABI; extraction is not runtime proof.
 - **Port drift.** The router configs, shared defaults, Firefox policy,
   and documentation are separate sources of truth. Update all of them.
-- **Configuration write failures.** Bash writes the config through a
-  temporary file and rename; PowerShell now writes a temporary file and
-  replaces it. Preserve that behavior.
+- **Configuration write failures.** Bash writes through a temporary file and
+  rename; PowerShell uses `File.Replace` for existing files. Preserve atomic
+  replacement and use `Language.NullString.Value`, not `$null`, for the optional
+  backup argument. This also applies to Java rollback and process identity
+  records. Test updates of existing files; the initial `File.Move` path does not
+  exercise replacement.
 
 ## References
 

@@ -225,7 +225,9 @@ function Set-RouterConf {
     try {
         [IO.File]::WriteAllLines($tmp, $lines, $utf8)
         if (Test-Path -LiteralPath $file) {
-            [IO.File]::Replace($tmp, $file, $null)
+            # A true null .NET string is required for the optional backup path.
+            [IO.File]::Replace($tmp, $file,
+                [System.Management.Automation.Language.NullString]::Value)
         }
         else {
             [IO.File]::Move($tmp, $file)
@@ -615,7 +617,8 @@ function Restore-RouterConfigSnapshot {
         foreach ($file in @('i2ptunnel.config', 'addressbook/config.txt', 'router.config')) {
             $source = Join-Path $Snapshot $file
             if (Test-Path -LiteralPath $source) {
-                [IO.File]::Replace($source, (Join-Path $script:BACKEND_DATA_DIR $file), $null)
+                [IO.File]::Replace($source, (Join-Path $script:BACKEND_DATA_DIR $file),
+                    [System.Management.Automation.Language.NullString]::Value)
             }
         }
         Remove-Item -LiteralPath $Snapshot -Recurse -Force
@@ -663,7 +666,8 @@ function Save-RouterProcessIdentity {
         }
         [IO.File]::WriteAllText($temporary, ($identity | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
         if (Test-Path -LiteralPath $script:BACKEND_PID_FILE) {
-            [IO.File]::Replace($temporary, $script:BACKEND_PID_FILE, $null)
+            [IO.File]::Replace($temporary, $script:BACKEND_PID_FILE,
+                [System.Management.Automation.Language.NullString]::Value)
         }
         else { [IO.File]::Move($temporary, $script:BACKEND_PID_FILE) }
         return [bool](Get-RouterManagedProcess)

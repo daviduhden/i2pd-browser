@@ -129,7 +129,11 @@ inspection.
 - **Case sensitivity.** Bash matches options case-sensitively;
   PowerShell's `switch -Regex` is case-insensitive by default.
 - **Atomic config writes.** `WriteAllLines` alone truncates in place.
-  Keep the temporary file and atomic replace.
+  Keep the temporary file and atomic replace. Pass
+  `[System.Management.Automation.Language.NullString]::Value` as the optional
+  `File.Replace` backup path: PowerShell converts a plain `$null` to an empty
+  string, which .NET rejects. Apply the same rule to policy and identity writes
+  and Java configuration recovery.
 - **Relative paths.** `-profile data` is relative to the caller's
   working directory unless made absolute.
 - **`winget` chains.** Capture each command's exit code; returning only

@@ -170,7 +170,8 @@ function script:Set-I2pJavaConfigValue {
     $temporary = "$Path.tmp.$PID"
     try {
         [IO.File]::WriteAllText($temporary, $updated, $encoding)
-        [IO.File]::Replace($temporary, $Path, $null)
+        [IO.File]::Replace($temporary, $Path,
+            [System.Management.Automation.Language.NullString]::Value)
     }
     catch {
         Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
@@ -313,7 +314,8 @@ function script:Set-I2pJavaProxyOverrides {
     catch {
         foreach ($file in $published) {
             try {
-                [IO.File]::Replace((Join-Path $old $file), (Join-Path $script:BACKEND_DATA_DIR $file), $null)
+                [IO.File]::Replace((Join-Path $old $file), (Join-Path $script:BACKEND_DATA_DIR $file),
+                    [System.Management.Automation.Language.NullString]::Value)
             }
             catch {
                 Write-RouterError (Get-I18nMessage 'error.effective-config' @($old))

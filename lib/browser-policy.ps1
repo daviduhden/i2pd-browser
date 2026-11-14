@@ -47,7 +47,8 @@ function Write-BrowserProxyPolicy {
             throw 'Browser proxy policy validation failed.'
         }
         if ([IO.File]::Exists($OutputPath)) {
-            [IO.File]::Replace($temporary, $OutputPath, $null)
+            [IO.File]::Replace($temporary, $OutputPath,
+                [System.Management.Automation.Language.NullString]::Value)
         }
         else { [IO.File]::Move($temporary, $OutputPath) }
     }
