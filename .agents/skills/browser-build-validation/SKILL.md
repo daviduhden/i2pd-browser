@@ -143,6 +143,17 @@ instead; the read-only knowledge validator is also available. Report every
 behavioral suite, real build and runtime check as not run. Never label test
 authoring as passing tests.
 
+## Inspecting failed manual runs
+
+Select the repository from its configured Git remote and pass `--repo OWNER/REPO`
+to `gh run list` and `gh run view --log-failed`. In a fork with an upstream
+remote, gh's default repository may select upstream rather than the push target.
+Read the failing job and step before changing YAML: successful parsing does not
+prove PowerShell persistence works. Exercise the native offline suites locally
+when a runtime is available, and distinguish PowerShell on Linux from Windows
+PowerShell 5.1 or a real Windows job. Do not automatically dispatch or rerun a
+workflow while investigating; preserve the manual owner-only gates.
+
 ## Evidence rules
 
 - State the exact commands, host platform, and whether `pwsh` was
